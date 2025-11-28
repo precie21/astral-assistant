@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg-primary: #0a0e27;
+    --color-bg-secondary: #151932;
+    --color-bg-tertiary: #1e2139;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #a0aec0;
+    --color-accent-cyan: #00f0ff;
+    --color-accent-purple: #b24bf3;
+    --color-accent-pink: #ff006e;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[var(--color-bg-primary)] text-[var(--color-text-primary)];
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  /* Glassmorphism effect */
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+
+  .glass-strong {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20;
+  }
+
+  /* Holographic glow effect */
+  .holo-glow {
+    box-shadow: 
+      0 0 10px rgba(0, 240, 255, 0.3),
+      0 0 20px rgba(0, 240, 255, 0.2),
+      0 0 30px rgba(0, 240, 255, 0.1);
+  }
+
+  /* Cyber button */
+  .cyber-button {
+    @apply glass px-6 py-3 rounded-lg font-medium transition-all duration-300;
+    @apply hover:bg-white/10 hover:border-cyber-cyan hover:shadow-lg;
+    @apply active:scale-95;
+  }
+
+  /* Status indicator */
+  .status-active {
+    @apply relative;
+  }
+
+  .status-active::before {
+    content: '';
+    @apply absolute -left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full;
+    @apply bg-cyber-cyan animate-pulse;
+  }
+
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/20 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/30;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-cyber-cyan to-cyber-purple bg-clip-text text-transparent;
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-purple)) 1;
+  }
+}
+
+/* Custom animations */
+@keyframes scan-line {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.scan-line {
+  animation: scan-line 8s linear infinite;
+}
+
+/* Prevent text selection for UI elements */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
