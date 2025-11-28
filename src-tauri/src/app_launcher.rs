@@ -42,7 +42,7 @@ fn get_app_registry() -> HashMap<String, AppInfo> {
     // Media
     apps.insert("spotify".to_string(), AppInfo {
         name: "Spotify".to_string(),
-        executable: "spotify".to_string(),
+        executable: "spotify.exe".to_string(),
         aliases: vec!["spotify".to_string(), "music".to_string()],
     });
     
@@ -55,7 +55,7 @@ fn get_app_registry() -> HashMap<String, AppInfo> {
     // Communication
     apps.insert("discord".to_string(), AppInfo {
         name: "Discord".to_string(),
-        executable: "Discord".to_string(),
+        executable: "Discord.exe".to_string(),
         aliases: vec!["discord".to_string()],
     });
     
@@ -67,7 +67,7 @@ fn get_app_registry() -> HashMap<String, AppInfo> {
     
     apps.insert("teams".to_string(), AppInfo {
         name: "Microsoft Teams".to_string(),
-        executable: "teams".to_string(),
+        executable: "ms-teams".to_string(),
         aliases: vec!["teams".to_string(), "microsoft teams".to_string()],
     });
     
@@ -137,47 +137,60 @@ pub fn find_app(query: &str) -> Option<AppInfo> {
 pub fn launch_app(app_name: &str) -> Result<LaunchResult, String> {
     let app_info = find_app(app_name).ok_or_else(|| format!("Application '{}' not found", app_name))?;
     
-    // Method 1: Try using Windows Shell via PowerShell (searches Start Menu)
+    println!("[APP_LAUNCHER] Attempting to launch: {} (executable: {})", app_info.name, app_info.executable);
+    
+    // Method 1: Try shell:AppsFolder protocol (most reliable for modern apps)
+    let shell_result = Command::new("explorer")
+        .arg(format!("shell:AppsFolder\\{}", app_info.name))
+        .spawn();
+    
+    if shell_result.is_ok() {
+        println!("[APP_LAUNCHER] Method 1 (shell:AppsFolder) succeeded");
+        return Ok(LaunchResult {
+            success: true,
+            message: format!("Launched {}", app_info.name),
+            app_name: app_info.name.clone(),
+        });
+    }
+    println!("[APP_LAUNCHER] Method 1 failed: {:?}", shell_result.err());
+    
+    // Method 2: Try using Windows Shell via PowerShell (searches Start Menu)
     let ps_result = Command::new("powershell")
         .args(&[
+            "-WindowStyle", "Hidden",
             "-Command",
-            &format!("Start-Process '{}'", app_info.name)
+            &format!("Start-Process '{}'", app_info.executable)
         ])
         .spawn();
     
     if ps_result.is_ok() {
+        println!("[APP_LAUNCHER] Method 2 (PowerShell) succeeded");
         return Ok(LaunchResult {
             success: true,
             message: format!("Launched {}", app_info.name),
             app_name: app_info.name.clone(),
         });
     }
+    println!("[APP_LAUNCHER] Method 2 failed: {:?}", ps_result.err());
     
-    // Method 2: Try cmd /c start with app name (searches PATH and Start Menu)
+    // Method 3: Try cmd /c start with executable (most compatible)
     let cmd_result = Command::new("cmd")
-        .args(&["/C", "start", "", &app_info.name])
-        .spawn();
-    
-    if cmd_result.is_ok() {
-        return Ok(LaunchResult {
-            success: true,
-            message: format!("Launched {}", app_info.name),
-            app_name: app_info.name.clone(),
-        });
-    }
-    
-    // Method 3: Try with executable name
-    let exe_result = Command::new("cmd")
         .args(&["/C", "start", "", &app_info.executable])
         .spawn();
     
-    match exe_result {
-        Ok(_) => Ok(LaunchResult {
-            success: true,
-            message: format!("Launched {}", app_info.name),
-            app_name: app_info.name.clone(),
-        }),
-        Err(e) => Err(format!("Failed to launch {}: {}. Try installing it or check if it's in your Start Menu.", app_info.name, e)),
+    match cmd_result {
+        Ok(_) => {
+            println!("[APP_LAUNCHER] Method 3 (cmd start) succeeded");
+            Ok(LaunchResult {
+                success: true,
+                message: format!("Launched {}", app_info.name),
+                app_name: app_info.name.clone(),
+            })
+        },
+        Err(e) => {
+            println!("[APP_LAUNCHER] All methods failed");
+            Err(format!("Failed to launch {}: {}. The app might not be installed or accessible.", app_info.name, e))
+        }
     }
 }
 

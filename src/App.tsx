@@ -417,7 +417,7 @@ function App() {
                 const greetings = [
                     "Hello! How can I assist you today?",
                     "Hi there! What can I do for you?",
-                    "Greetings! I'm ASTRAL, your AI assistant. How may I help?",
+                    "Greetings! I'm AKI, your AI assistant. How may I help?",
                     "Hello! Ready to assist you.",
                 ];
                 response = greetings[Math.floor(Math.random() * greetings.length)];
