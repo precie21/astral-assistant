@@ -275,8 +275,17 @@ pub async fn get_tts_config() -> Result<TTSConfig, String> {
 
 #[tauri::command]
 pub async fn update_tts_config(config: TTSConfig) -> Result<(), String> {
+    // Update global config
     let mut global_config = TTS_CONFIG.lock().await;
-    *global_config = config;
+    *global_config = config.clone();
+    drop(global_config); // Release lock
+    
+    // Update engine config too
+    let mut engine = TTS_ENGINE.lock().await;
+    if let Some(ref mut e) = *engine {
+        e.config = config;
+    }
+    
     Ok(())
 }
 
