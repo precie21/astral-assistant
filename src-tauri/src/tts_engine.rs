@@ -136,7 +136,13 @@ impl TTSEngine {
             return Ok(self.config.piper_executable.clone());
         }
 
-        // Try resource directory if app_handle available
+        // In dev mode, check src-tauri/resources directly
+        let dev_path = std::path::Path::new("src-tauri/resources").join(&self.config.piper_executable);
+        if dev_path.exists() {
+            return Ok(dev_path.to_string_lossy().to_string());
+        }
+
+        // Try resource directory if app_handle available (production)
         if let Some(app) = &self.app_handle {
             if let Ok(resource_dir) = app.path().resource_dir() {
                 let piper_path = resource_dir.join(&self.config.piper_executable);
@@ -171,7 +177,13 @@ impl TTSEngine {
             return Ok(self.config.voice_model_path.clone());
         }
 
-        // Try resource directory
+        // In dev mode, check src-tauri/resources directly
+        let dev_path = std::path::Path::new("src-tauri/resources").join(&self.config.voice_model_path);
+        if dev_path.exists() {
+            return Ok(dev_path.to_string_lossy().to_string());
+        }
+
+        // Try resource directory (production)
         if let Some(app) = &self.app_handle {
             if let Ok(resource_dir) = app.path().resource_dir() {
                 let model_path = resource_dir.join(&self.config.voice_model_path);
