@@ -22,15 +22,15 @@ function HolographicOrb({ state, audioLevel = 0 }: { state: string; audioLevel?:
             
             // Enhanced movement when speaking/thinking
             if (state === 'speaking' || state === 'thinking') {
-                // Circular motion
-                const radius = 0.3;
-                const speed = 2;
+                // Subtle circular motion (much smaller radius)
+                const radius = 0.15;
+                const speed = 1.5;
                 meshRef.current.position.x = Math.cos(frameState.clock.elapsedTime * speed) * radius;
                 meshRef.current.position.y = Math.sin(frameState.clock.elapsedTime * speed * 0.7) * radius;
                 
                 // Extra rotation when active
                 meshRef.current.rotation.y += 0.015;
-                meshRef.current.rotation.z = Math.sin(frameState.clock.elapsedTime * 1.5) * 0.15;
+                meshRef.current.rotation.z = Math.sin(frameState.clock.elapsedTime * 1.5) * 0.1;
             } else {
                 // Return to center smoothly
                 meshRef.current.position.x *= 0.95;
