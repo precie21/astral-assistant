@@ -14,7 +14,7 @@ function App() {
     const synthRef = useRef<SpeechSynthesis | null>(null);
 
     useEffect(() => {
-        // Initialize the assistant on mount
+        // Initialize the assistant on mount (only once)
         initializeAssistant();
         
         // Initialize speech recognition
@@ -63,13 +63,13 @@ function App() {
                 recognitionRef.current.stop();
             }
         };
-    }, [transcript]);
+    }, []); // Empty dependency array - run only once on mount
 
     const initializeAssistant = async () => {
         try {
-            await invoke("initialize_assistant");
-            console.log("ASTRAL initialized successfully");
-            speak("ASTRAL initialized and ready");
+            const message = await invoke("initialize_assistant");
+            console.log("ASTRAL initialized successfully:", message);
+            // Removed the speak call so it doesn't announce on every init
         } catch (error) {
             console.error("Failed to initialize ASTRAL:", error);
         }
