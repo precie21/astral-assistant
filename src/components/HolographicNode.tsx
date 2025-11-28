@@ -14,10 +14,29 @@ function HolographicOrb({ state, audioLevel = 0 }: { state: string; audioLevel?:
     const meshRef = useRef<THREE.Mesh>(null);
     const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-    useFrame((state) => {
+    useFrame((frameState) => {
         if (meshRef.current) {
+            // Base rotation
             meshRef.current.rotation.y += 0.005;
-            meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+            meshRef.current.rotation.x = Math.sin(frameState.clock.elapsedTime * 0.5) * 0.1;
+            
+            // Enhanced movement when speaking/thinking
+            if (state === 'speaking' || state === 'thinking') {
+                // Circular motion
+                const radius = 0.3;
+                const speed = 2;
+                meshRef.current.position.x = Math.cos(frameState.clock.elapsedTime * speed) * radius;
+                meshRef.current.position.y = Math.sin(frameState.clock.elapsedTime * speed * 0.7) * radius;
+                
+                // Extra rotation when active
+                meshRef.current.rotation.y += 0.015;
+                meshRef.current.rotation.z = Math.sin(frameState.clock.elapsedTime * 1.5) * 0.15;
+            } else {
+                // Return to center smoothly
+                meshRef.current.position.x *= 0.95;
+                meshRef.current.position.y *= 0.95;
+                meshRef.current.rotation.z *= 0.95;
+            }
             
             // Pulsate based on audio level
             const baseScale = 1;
