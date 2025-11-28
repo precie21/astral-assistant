@@ -136,10 +136,17 @@ impl TTSEngine {
             return Ok(self.config.piper_executable.clone());
         }
 
-        // In dev mode, check src-tauri/resources directly
-        let dev_path = std::path::Path::new("src-tauri/resources").join(&self.config.piper_executable);
-        if dev_path.exists() {
-            return Ok(dev_path.to_string_lossy().to_string());
+        // Try multiple dev mode paths
+        let dev_paths = vec![
+            std::path::Path::new("src-tauri/resources").join(&self.config.piper_executable),
+            std::path::Path::new("../src-tauri/resources").join(&self.config.piper_executable),
+            std::path::Path::new("resources").join(&self.config.piper_executable),
+        ];
+        
+        for dev_path in dev_paths {
+            if dev_path.exists() {
+                return Ok(dev_path.to_string_lossy().to_string());
+            }
         }
 
         // Try resource directory if app_handle available (production)
@@ -167,7 +174,9 @@ impl TTSEngine {
             }
         }
 
-        Err(format!("Piper executable '{}' not found in PATH or resources", self.config.piper_executable))
+        // Debug: show current directory
+        let cwd = std::env::current_dir().unwrap_or_default();
+        Err(format!("Piper executable '{}' not found. Current dir: {}", self.config.piper_executable, cwd.display()))
     }
 
     /// Get full path to voice model
@@ -177,10 +186,17 @@ impl TTSEngine {
             return Ok(self.config.voice_model_path.clone());
         }
 
-        // In dev mode, check src-tauri/resources directly
-        let dev_path = std::path::Path::new("src-tauri/resources").join(&self.config.voice_model_path);
-        if dev_path.exists() {
-            return Ok(dev_path.to_string_lossy().to_string());
+        // Try multiple dev mode paths
+        let dev_paths = vec![
+            std::path::Path::new("src-tauri/resources").join(&self.config.voice_model_path),
+            std::path::Path::new("../src-tauri/resources").join(&self.config.voice_model_path),
+            std::path::Path::new("resources").join(&self.config.voice_model_path),
+        ];
+        
+        for dev_path in dev_paths {
+            if dev_path.exists() {
+                return Ok(dev_path.to_string_lossy().to_string());
+            }
         }
 
         // Try resource directory (production)
