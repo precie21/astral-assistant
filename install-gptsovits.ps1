@@ -79,7 +79,7 @@ if (Test-Path "requirements.txt") {
 
 # Install additional packages for API server
 Write-Host "[INFO] Installing API server dependencies..." -ForegroundColor Cyan
-pip install fastapi uvicorn soundfile pydantic
+pip install fastapi uvicorn soundfile pydantic numpy
 
 # Download pre-trained models
 Write-Host "[INFO] Downloading pre-trained models..." -ForegroundColor Cyan
@@ -118,6 +118,7 @@ import os
 import sys
 import torch
 import io
+import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
@@ -146,11 +147,17 @@ class TTSRequest(BaseModel):
 async def generate_speech(request: TTSRequest):
     try:
         if get_tts_wav is None:
-            # Mock response for testing
-            return Response(
-                content=b"RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00D\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00",
-                media_type="audio/wav"
-            )
+            # Mock response - generate 1 second of silence as valid WAV
+            import numpy as np
+            sample_rate = 32000
+            duration = 1.0
+            silence = np.zeros(int(sample_rate * duration), dtype=np.float32)
+            
+            buffer = io.BytesIO()
+            sf.write(buffer, silence, sample_rate, format='WAV')
+            buffer.seek(0)
+            
+            return Response(content=buffer.read(), media_type="audio/wav")
         
         # Generate speech using GPT-SoVITS
         audio_output = get_tts_wav(
