@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
+import { invoke } from "@tauri-apps/api/core";
 import HolographicNode from "./components/HolographicNode";
 import Dashboard from "./components/Dashboard";
 import SystemTray from "./components/SystemTray";
