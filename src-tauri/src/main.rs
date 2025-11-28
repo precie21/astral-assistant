@@ -43,6 +43,15 @@ fn main() {
             list_voices,
             test_piper_tts,
         ])
+        .setup(|app| {
+            // Initialize TTS engine with app handle
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tts_engine::init_tts_engine(app_handle).await;
+                info!("TTS engine initialized");
+            });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");
 }
