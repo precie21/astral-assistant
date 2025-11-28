@@ -17,7 +17,7 @@ impl Default for ElevenLabsConfig {
         Self {
             api_key: String::new(),
             voice_id: "21m00Tcm4TlvDq8ikWAM".to_string(), // Rachel - default voice
-            model_id: "eleven_monolingual_v1".to_string(),
+            model_id: "eleven_turbo_v2_5".to_string(), // Updated model for free tier
             enabled: false,
         }
     }

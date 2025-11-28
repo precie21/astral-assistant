@@ -315,7 +315,7 @@ function SettingsTab() {
                                     config: {
                                         api_key: ttsApiKey,
                                         voice_id: ttsVoice,
-                                        model_id: 'eleven_monolingual_v1',
+                                        model_id: 'eleven_turbo_v2_5',
                                         enabled: newState
                                     }
                                 });
@@ -342,7 +342,7 @@ function SettingsTab() {
                                         config: {
                                             api_key: newKey,
                                             voice_id: ttsVoice,
-                                            model_id: 'eleven_monolingual_v1',
+                                            model_id: 'eleven_turbo_v2_5',
                                             enabled: ttsEnabled
                                         }
                                     });
@@ -367,7 +367,7 @@ function SettingsTab() {
                                         config: {
                                             api_key: ttsApiKey,
                                             voice_id: newVoice,
-                                            model_id: 'eleven_monolingual_v1',
+                                            model_id: 'eleven_turbo_v2_5',
                                             enabled: ttsEnabled
                                         }
                                     });
