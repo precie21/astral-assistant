@@ -106,13 +106,13 @@ function App() {
         setAssistantState('speaking');
         
         try {
-            // Try GPT-SoVITS first
-            const config: any = await invoke("gptsovits_get_config");
+            // Try ElevenLabs first
+            const config: any = await invoke("elevenlabs_get_config");
             
             if (config.enabled) {
-                console.log('Using GPT-SoVITS TTS');
-                const audioPath: string = await invoke("gptsovits_speak", { text });
-                console.log('GPT-SoVITS generated audio at:', audioPath);
+                console.log('Using ElevenLabs TTS');
+                const audioPath: string = await invoke("elevenlabs_speak", { text });
+                console.log('ElevenLabs generated audio at:', audioPath);
                 
                 // Convert file path to Tauri asset protocol
                 const { convertFileSrc } = await import('@tauri-apps/api/core');
@@ -121,11 +121,11 @@ function App() {
                 // Play the audio file
                 const audio = new Audio(assetUrl);
                 audio.onended = () => {
-                    console.log('GPT-SoVITS speech ended');
+                    console.log('ElevenLabs speech ended');
                     setAssistantState('idle');
                 };
                 audio.onerror = (e) => {
-                    console.error('GPT-SoVITS audio playback error:', e);
+                    console.error('ElevenLabs audio playback error:', e);
                     console.log('Falling back to browser TTS');
                     speakWithBrowser(text);
                 };
@@ -133,7 +133,7 @@ function App() {
                 return;
             }
         } catch (error) {
-            console.log('GPT-SoVITS not available, using browser TTS:', error);
+            console.log('ElevenLabs not available, using browser TTS:', error);
         }
         
         // Fallback to browser TTS

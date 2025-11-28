@@ -203,30 +203,34 @@ function SettingsTab() {
     const [llmProvider, setLlmProvider] = useState('Ollama');
     const [showApiKey, setShowApiKey] = useState(false);
     const [ttsEnabled, setTtsEnabled] = useState(false);
-    const [ttsServerStatus, setTtsServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+    const [ttsApiKey, setTtsApiKey] = useState('');
+    const [ttsVoice, setTtsVoice] = useState('21m00Tcm4TlvDq8ikWAM');
+    const [voices, setVoices] = useState<any[]>([]);
 
     useEffect(() => {
         loadTTSConfig();
-        checkTTSServerStatus();
+        loadVoices();
     }, []);
 
     const loadTTSConfig = async () => {
         try {
             const { invoke } = await import('@tauri-apps/api/core');
-            const config: any = await invoke('gptsovits_get_config');
+            const config: any = await invoke('elevenlabs_get_config');
             setTtsEnabled(config.enabled);
+            setTtsApiKey(config.api_key);
+            setTtsVoice(config.voice_id);
         } catch (error) {
             console.error('Failed to load TTS config:', error);
         }
     };
 
-    const checkTTSServerStatus = async () => {
+    const loadVoices = async () => {
         try {
             const { invoke } = await import('@tauri-apps/api/core');
-            const isOnline: boolean = await invoke('gptsovits_health_check');
-            setTtsServerStatus(isOnline ? 'online' : 'offline');
+            const voiceList: any[] = await invoke('elevenlabs_get_voices');
+            setVoices(voiceList);
         } catch (error) {
-            setTtsServerStatus('offline');
+            console.error('Failed to load voices:', error);
         }
     };
 
@@ -297,49 +301,93 @@ function SettingsTab() {
             </div>
 
             <div className="glass p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings</h3>
+                <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings (ElevenLabs)</h3>
                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="text-sm font-medium">GPT-SoVITS Server</div>
-                            <div className="text-xs text-white/50">
-                                Status: {ttsServerStatus === 'checking' ? '⏳ Checking...' : 
-                                        ttsServerStatus === 'online' ? '🟢 Online' : 
-                                        '🔴 Offline'}
-                            </div>
-                        </div>
-                        <button 
-                            className="text-xs cyber-button px-2 py-1"
-                            onClick={checkTTSServerStatus}
-                        >
-                            Refresh
-                        </button>
-                    </div>
-                    
                     <ToggleItem 
-                        label="Use GPT-SoVITS (Natural Voice)" 
+                        label="Use ElevenLabs (Natural Voice)" 
                         enabled={ttsEnabled}
                         onToggle={async () => {
                             const newState = !ttsEnabled;
                             setTtsEnabled(newState);
                             try {
                                 const { invoke } = await import('@tauri-apps/api/core');
-                                const config: any = await invoke('gptsovits_get_config');
-                                config.enabled = newState;
-                                await invoke('gptsovits_update_config', { config });
-                                console.log('GPT-SoVITS', newState ? 'enabled' : 'disabled');
+                                await invoke('elevenlabs_update_config', {
+                                    config: {
+                                        api_key: ttsApiKey,
+                                        voice_id: ttsVoice,
+                                        model_id: 'eleven_monolingual_v1',
+                                        enabled: newState
+                                    }
+                                });
+                                console.log('ElevenLabs', newState ? 'enabled' : 'disabled');
                             } catch (error) {
                                 console.error('Failed to update TTS config:', error);
                             }
                         }}
                     />
                     
+                    <div>
+                        <label className="text-xs text-white/50 block mb-1">API Key</label>
+                        <input 
+                            type="password"
+                            className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-sm"
+                            placeholder="sk_..."
+                            value={ttsApiKey}
+                            onChange={async (e) => {
+                                const newKey = e.target.value;
+                                setTtsApiKey(newKey);
+                                try {
+                                    const { invoke } = await import('@tauri-apps/api/core');
+                                    await invoke('elevenlabs_update_config', {
+                                        config: {
+                                            api_key: newKey,
+                                            voice_id: ttsVoice,
+                                            model_id: 'eleven_monolingual_v1',
+                                            enabled: ttsEnabled
+                                        }
+                                    });
+                                } catch (error) {
+                                    console.error('Failed to update API key:', error);
+                                }
+                            }}
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="text-xs text-white/50 block mb-1">Voice</label>
+                        <select 
+                            className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-sm"
+                            value={ttsVoice}
+                            onChange={async (e) => {
+                                const newVoice = e.target.value;
+                                setTtsVoice(newVoice);
+                                try {
+                                    const { invoke } = await import('@tauri-apps/api/core');
+                                    await invoke('elevenlabs_update_config', {
+                                        config: {
+                                            api_key: ttsApiKey,
+                                            voice_id: newVoice,
+                                            model_id: 'eleven_monolingual_v1',
+                                            enabled: ttsEnabled
+                                        }
+                                    });
+                                } catch (error) {
+                                    console.error('Failed to update voice:', error);
+                                }
+                            }}
+                        >
+                            {voices.map(voice => (
+                                <option key={voice.id} value={voice.id}>{voice.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    
                     <button 
                         className="w-full cyber-button text-sm"
                         onClick={async () => {
                             try {
                                 const { invoke } = await import('@tauri-apps/api/core');
-                                const result: string = await invoke('gptsovits_test');
+                                const result: string = await invoke('elevenlabs_test');
                                 alert(result);
                             } catch (error) {
                                 alert('Test failed: ' + error);
@@ -349,14 +397,8 @@ function SettingsTab() {
                         Test Voice
                     </button>
                     
-                    {ttsServerStatus === 'offline' && (
-                        <div className="text-xs text-white/50 bg-red-500/10 border border-red-500/30 rounded p-2">
-                            ⚠️ Server offline. Start with: cd gpt-sovits && .\start_server.bat
-                        </div>
-                    )}
-                    
                     <div className="text-xs text-white/50 bg-cyber-purple/10 border border-cyber-purple/30 rounded p-2">
-                        ℹ️ Run install-gptsovits.ps1 to setup (~2GB download)
+                        ℹ️ Get free API key at <a href="https://elevenlabs.io" target="_blank" className="text-cyber-cyan underline">elevenlabs.io</a> (10k chars/month free)
                     </div>
                 </div>
             </div>
