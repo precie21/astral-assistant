@@ -10,27 +10,27 @@ interface HolographicNodeProps {
     audioLevel?: number; // 0-1 range
 }
 
-function HolographicOrb({ state, audioLevel = 0 }: { state: string; audioLevel?: number }) {
+function HolographicOrb({ state: assistantState, audioLevel = 0 }: { state: string; audioLevel?: number }) {
     const meshRef = useRef<THREE.Mesh>(null);
     const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-    useFrame((frameState) => {
+    useFrame((state) => {
         if (meshRef.current) {
             // Base rotation
             meshRef.current.rotation.y += 0.005;
-            meshRef.current.rotation.x = Math.sin(frameState.clock.elapsedTime * 0.5) * 0.1;
+            meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
             
             // Enhanced movement when speaking/thinking
-            if (state === 'speaking' || state === 'thinking') {
+            if (assistantState === 'speaking' || assistantState === 'thinking') {
                 // Subtle circular motion (much smaller radius)
                 const radius = 0.15;
                 const speed = 1.5;
-                meshRef.current.position.x = Math.cos(frameState.clock.elapsedTime * speed) * radius;
-                meshRef.current.position.y = Math.sin(frameState.clock.elapsedTime * speed * 0.7) * radius;
+                meshRef.current.position.x = Math.cos(state.clock.elapsedTime * speed) * radius;
+                meshRef.current.position.y = Math.sin(state.clock.elapsedTime * speed * 0.7) * radius;
                 
                 // Extra rotation when active
                 meshRef.current.rotation.y += 0.015;
-                meshRef.current.rotation.z = Math.sin(frameState.clock.elapsedTime * 1.5) * 0.1;
+                meshRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.5) * 0.1;
             } else {
                 // Return to center smoothly
                 meshRef.current.position.x *= 0.95;
