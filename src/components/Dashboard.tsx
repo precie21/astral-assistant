@@ -301,7 +301,14 @@ function SettingsTab() {
             </div>
 
             <div className="glass p-4 rounded-lg">
-                <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings (ElevenLabs)</h3>
+                <h3 className="text-sm font-semibold text-white/60 mb-3">Speech-to-Text (Whisper)</h3>
+                <div className="space-y-3">
+                    <WhisperSettings />
+                </div>
+            </div>
+
+            <div className="glass p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-white/60 mb-3">Text-to-Speech (ElevenLabs)</h3>
                 <div className="space-y-3">
                     <ToggleItem 
                         label="Use ElevenLabs (Natural Voice)" 
@@ -467,6 +474,97 @@ function SettingItem({ label, value }: { label: string; value: string }) {
             <span className="text-sm text-white/70">{label}</span>
             <span className="text-sm font-medium">{value}</span>
         </div>
+    );
+}
+
+function WhisperSettings() {
+    const [whisperEnabled, setWhisperEnabled] = useState(false);
+    const [whisperUrl, setWhisperUrl] = useState('http://localhost:9881');
+    const [isHealthy, setIsHealthy] = useState(false);
+
+    useEffect(() => {
+        loadWhisperConfig();
+    }, []);
+
+    const loadWhisperConfig = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const config: any = await invoke('whisper_get_config');
+            setWhisperEnabled(config.enabled);
+            setWhisperUrl(config.server_url);
+            
+            if (config.enabled) {
+                checkHealth();
+            }
+        } catch (error) {
+            console.error('Failed to load Whisper config:', error);
+        }
+    };
+
+    const checkHealth = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const healthy = await invoke('whisper_health_check');
+            setIsHealthy(healthy as boolean);
+        } catch (error) {
+            setIsHealthy(false);
+        }
+    };
+
+    return (
+        <>
+            <ToggleItem 
+                label="Use Whisper (Better Accuracy)" 
+                enabled={whisperEnabled}
+                onToggle={async () => {
+                    const newState = !whisperEnabled;
+                    setWhisperEnabled(newState);
+                    try {
+                        const { invoke } = await import('@tauri-apps/api/core');
+                        await invoke('whisper_update_config', {
+                            config: {
+                                server_url: whisperUrl,
+                                model: 'base.en',
+                                enabled: newState
+                            }
+                        });
+                        if (newState) {
+                            checkHealth();
+                        }
+                    } catch (error) {
+                        console.error('Failed to update Whisper config:', error);
+                    }
+                }}
+            />
+            
+            <div>
+                <label className="text-xs text-white/50 block mb-1">Server URL</label>
+                <input 
+                    type="text"
+                    className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-sm"
+                    value={whisperUrl}
+                    onChange={(e) => setWhisperUrl(e.target.value)}
+                    placeholder="http://localhost:9881"
+                />
+            </div>
+
+            {whisperEnabled && (
+                <div className={`text-xs p-2 rounded ${isHealthy ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}>
+                    {isHealthy ? '✓ Whisper server is running' : '✗ Server not responding. Run install-whisper.ps1'}
+                </div>
+            )}
+
+            <button 
+                className="w-full cyber-button text-sm"
+                onClick={checkHealth}
+            >
+                Test Connection
+            </button>
+
+            <div className="text-xs text-white/50 bg-cyber-cyan/10 border border-cyber-cyan/30 rounded p-2">
+                ℹ️ Local speech recognition with Whisper.cpp (offline, multilingual, more accurate)
+            </div>
+        </>
     );
 }
 

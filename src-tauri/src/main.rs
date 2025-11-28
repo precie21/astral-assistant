@@ -10,9 +10,11 @@ mod config;
 mod llm_provider;
 mod automation;
 mod elevenlabs_tts;
+mod whisper_stt;
 
 use commands::*;
 use elevenlabs_tts::*;
+use whisper_stt::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
@@ -42,6 +44,11 @@ fn main() {
             elevenlabs_update_config,
             elevenlabs_test,
             elevenlabs_get_voices,
+            whisper_get_config,
+            whisper_update_config,
+            whisper_health_check,
+            whisper_transcribe,
+            whisper_transcribe_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");

@@ -12,10 +12,16 @@ function App() {
     const [commandHistory, setCommandHistory] = useState<string[]>([]);
     const recognitionRef = useRef<any>(null);
     const synthRef = useRef<SpeechSynthesis | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const [useWhisper, setUseWhisper] = useState(false);
 
     useEffect(() => {
         // Initialize the assistant on mount (only once)
         initializeAssistant();
+        
+        // Check if Whisper is available and enabled
+        checkWhisperAvailability();
         
         // Initialize speech recognition
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -80,24 +86,151 @@ function App() {
         }
     };
 
+    const checkWhisperAvailability = async () => {
+        try {
+            const config: any = await invoke("whisper_get_config");
+            if (config.enabled) {
+                const isHealthy = await invoke("whisper_health_check");
+                if (isHealthy) {
+                    console.log("Whisper STT available and healthy");
+                    setUseWhisper(true);
+                } else {
+                    console.log("Whisper server not healthy, using browser speech recognition");
+                }
+            }
+        } catch (error) {
+            console.log("Whisper not available, using browser speech recognition:", error);
+        }
+    };
+
     const toggleDashboard = () => {
         setShowDashboard(!showDashboard);
     };
 
-    const startListening = () => {
-        if (recognitionRef.current && !isListening) {
-            setTranscript("");
+    const startListening = async () => {
+        if (isListening) return;
+        
+        setTranscript("");
+        
+        // Use Whisper if available
+        if (useWhisper) {
             try {
-                recognitionRef.current.start();
+                console.log("Starting Whisper recording...");
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const options = { mimeType: 'audio/webm' };
+                mediaRecorderRef.current = new MediaRecorder(stream, options);
+                audioChunksRef.current = [];
+                
+                mediaRecorderRef.current.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunksRef.current.push(event.data);
+                    }
+                };
+                
+                mediaRecorderRef.current.onstop = async () => {
+                    console.log("Recording stopped, processing with Whisper...");
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                    
+                    // Convert to WAV format for Whisper
+                    const audioContext = new AudioContext();
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    
+                    // Convert AudioBuffer to WAV
+                    const wavBlob = await audioBufferToWav(audioBuffer);
+                    const wavBytes = new Uint8Array(await wavBlob.arrayBuffer());
+                    
+                    try {
+                        setAssistantState('thinking');
+                        const transcript: string = await invoke("whisper_transcribe_bytes", { 
+                            audioBytes: Array.from(wavBytes)
+                        });
+                        console.log("Whisper transcription:", transcript);
+                        setTranscript(transcript);
+                        processCommand(transcript);
+                    } catch (error) {
+                        console.error("Whisper transcription failed:", error);
+                        setAssistantState('idle');
+                    }
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorderRef.current.start();
+                setAssistantState('listening');
+                setIsListening(true);
             } catch (error) {
-                console.error('Error starting recognition:', error);
+                console.error('Error starting Whisper recording:', error);
+                setAssistantState('idle');
+            }
+        } else {
+            // Use browser speech recognition
+            if (recognitionRef.current && !isListening) {
+                try {
+                    recognitionRef.current.start();
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                }
             }
         }
     };
 
     const stopListening = () => {
-        if (recognitionRef.current && isListening) {
+        if (useWhisper && mediaRecorderRef.current && isListening) {
+            console.log("Stopping Whisper recording...");
+            mediaRecorderRef.current.stop();
+            setIsListening(false);
+        } else if (recognitionRef.current && isListening) {
             recognitionRef.current.stop();
+        }
+    };
+
+    // Helper function to convert AudioBuffer to WAV
+    const audioBufferToWav = async (audioBuffer: AudioBuffer): Promise<Blob> => {
+        const numberOfChannels = audioBuffer.numberOfChannels;
+        const sampleRate = audioBuffer.sampleRate;
+        const format = 1; // PCM
+        const bitDepth = 16;
+        
+        const bytesPerSample = bitDepth / 8;
+        const blockAlign = numberOfChannels * bytesPerSample;
+        
+        const data = audioBuffer.getChannelData(0);
+        const dataLength = data.length * bytesPerSample;
+        const buffer = new ArrayBuffer(44 + dataLength);
+        const view = new DataView(buffer);
+        
+        // Write WAV header
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataLength, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, format, true);
+        view.setUint16(22, numberOfChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, bitDepth, true);
+        writeString(view, 36, 'data');
+        view.setUint32(40, dataLength, true);
+        
+        // Write PCM data
+        let offset = 44;
+        for (let i = 0; i < data.length; i++) {
+            const sample = Math.max(-1, Math.min(1, data[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
+        }
+        
+        return new Blob([buffer], { type: 'audio/wav' });
+    };
+
+    const writeString = (view: DataView, offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
         }
     };
 
