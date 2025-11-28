@@ -9,7 +9,7 @@ import uvicorn
 app = FastAPI()
 
 WHISPER_EXECUTABLE = "./main.exe" if os.name == "nt" else "./main"
-MODEL_PATH = "models/ggml-base.en.bin"
+MODEL_PATH = "models/ggml-small.en.bin"  # Changed from base.en
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):

@@ -7,17 +7,28 @@ interface DashboardProps {
 
 export default function Dashboard({ onClose }: DashboardProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'automation' | 'settings'>('overview');
-    const [systemStats, setSystemStats] = useState({ cpu: 0, memory: 0, gpu: 0 });
+    const [systemStats, setSystemStats] = useState({ cpu: 0, memory: 0, memoryUsed: 0, memoryTotal: 0, gpu: 0 });
 
     useEffect(() => {
         // Update system stats every 2 seconds
-        const interval = setInterval(() => {
-            setSystemStats({
-                cpu: Math.floor(Math.random() * 100),
-                memory: Math.floor(Math.random() * 100),
-                gpu: Math.floor(Math.random() * 100)
-            });
-        }, 2000);
+        const updateStats = async () => {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                const stats: any = await invoke('get_system_stats_command');
+                setSystemStats({
+                    cpu: Math.round(stats.cpu_usage),
+                    memory: Math.round(stats.memory_usage),
+                    memoryUsed: Math.round(stats.memory_used / (1024 * 1024 * 1024)), // Convert to GB
+                    memoryTotal: Math.round(stats.memory_total / (1024 * 1024 * 1024)), // Convert to GB
+                    gpu: stats.gpu_usage ? Math.round(stats.gpu_usage) : 0
+                });
+            } catch (error) {
+                console.error('Failed to get system stats:', error);
+            }
+        };
+
+        updateStats(); // Initial load
+        const interval = setInterval(updateStats, 2000);
         return () => clearInterval(interval);
     }, []);
 
@@ -70,15 +81,15 @@ export default function Dashboard({ onClose }: DashboardProps) {
     );
 }
 
-function OverviewTab({ stats }: { stats: { cpu: number; memory: number; gpu: number } }) {
+function OverviewTab({ stats }: { stats: { cpu: number; memory: number; memoryUsed: number; memoryTotal: number; gpu: number } }) {
     return (
         <div className="space-y-4">
             <div className="glass p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-white/60 mb-3">System Status</h3>
                 <div className="space-y-2">
                     <StatusItem label="CPU" value={`${stats.cpu}%`} color="cyan" percent={stats.cpu} />
-                    <StatusItem label="Memory" value={`${stats.memory}%`} color="purple" percent={stats.memory} />
-                    <StatusItem label="GPU" value={`${stats.gpu}%`} color="pink" percent={stats.gpu} />
+                    <StatusItem label="Memory" value={`${stats.memoryUsed}/${stats.memoryTotal} GB`} color="purple" percent={stats.memory} />
+                    <StatusItem label="GPU" value={stats.gpu > 0 ? `${stats.gpu}%` : 'N/A'} color="pink" percent={stats.gpu} />
                 </div>
             </div>
 
@@ -411,6 +422,13 @@ function SettingsTab() {
             </div>
 
             <div className="glass p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-white/60 mb-3">Wake Word Detection</h3>
+                <div className="space-y-3">
+                    <WakeWordSettings />
+                </div>
+            </div>
+
+            <div className="glass p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-white/60 mb-3">Privacy</h3>
                 <div className="space-y-3">
                     <ToggleItem 
@@ -563,6 +581,86 @@ function WhisperSettings() {
 
             <div className="text-xs text-white/50 bg-cyber-cyan/10 border border-cyber-cyan/30 rounded p-2">
                 ℹ️ Local speech recognition with Whisper.cpp (offline, multilingual, more accurate)
+            </div>
+        </>
+    );
+}
+
+function WakeWordSettings() {
+    const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
+    const [isActive, setIsActive] = useState(false);
+
+    useEffect(() => {
+        loadWakeWordConfig();
+        checkIfActive();
+    }, []);
+
+    const loadWakeWordConfig = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const config: any = await invoke('get_wake_word_config');
+            setWakeWordEnabled(config.enabled);
+        } catch (error) {
+            console.error('Failed to load wake word config:', error);
+        }
+    };
+
+    const checkIfActive = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const active = await invoke('is_wake_word_active');
+            setIsActive(active as boolean);
+        } catch (error) {
+            console.error('Failed to check wake word status:', error);
+        }
+    };
+
+    const toggleWakeWord = async () => {
+        const newState = !wakeWordEnabled;
+        setWakeWordEnabled(newState);
+        
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('update_wake_word_config', {
+                config: {
+                    enabled: newState,
+                    phrase: 'hey aki',
+                    sensitivity: 0.7
+                }
+            });
+            
+            // Start/stop detection based on new state
+            if (newState) {
+                await invoke('start_wake_word_detection');
+                setIsActive(true);
+            } else {
+                await invoke('stop_wake_word_detection');
+                setIsActive(false);
+            }
+            
+            console.log('Wake word', newState ? 'enabled' : 'disabled');
+        } catch (error) {
+            console.error('Failed to update wake word config:', error);
+            setWakeWordEnabled(!newState); // Revert on error
+        }
+    };
+
+    return (
+        <>
+            <ToggleItem 
+                label='Always Listen for "Hey AKI"' 
+                enabled={wakeWordEnabled}
+                onToggle={toggleWakeWord}
+            />
+            
+            {wakeWordEnabled && (
+                <div className={`text-xs p-2 rounded ${isActive ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400'}`}>
+                    {isActive ? '🎤 Listening for wake word...' : '⏸️ Wake word detection paused'}
+                </div>
+            )}
+            
+            <div className="text-xs text-white/50 bg-cyber-purple/10 border border-cyber-purple/30 rounded p-2">
+                ℹ️ Say "Hey AKI" to activate hands-free. (Placeholder - full implementation coming soon)
             </div>
         </>
     );

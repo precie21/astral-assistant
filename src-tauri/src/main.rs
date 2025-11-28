@@ -11,10 +11,18 @@ mod llm_provider;
 mod automation;
 mod elevenlabs_tts;
 mod whisper_stt;
+mod system_monitor;
+mod app_launcher;
+mod settings;
+mod wake_word;
 
 use commands::*;
 use elevenlabs_tts::*;
 use whisper_stt::*;
+use system_monitor::*;
+use app_launcher::*;
+use settings::*;
+use wake_word::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
@@ -49,6 +57,22 @@ fn main() {
             whisper_health_check,
             whisper_transcribe,
             whisper_transcribe_bytes,
+            get_system_stats_command,
+            get_cpu_usage_command,
+            get_memory_usage_command,
+            get_gpu_usage_command,
+            launch_application,
+            get_available_apps,
+            find_app_command,
+            load_settings,
+            save_settings,
+            update_setting,
+            reset_settings,
+            get_wake_word_config,
+            update_wake_word_config,
+            start_wake_word_detection,
+            stop_wake_word_detection,
+            is_wake_word_active,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");

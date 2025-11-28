@@ -153,7 +153,7 @@ pub async fn elevenlabs_update_config(config: ElevenLabsConfig) -> Result<(), St
 pub async fn elevenlabs_test() -> Result<String, String> {
     let engine = TTS_ENGINE.lock().await;
     
-    let test_text = "Hello! This is ASTRAL testing ElevenLabs text to speech. The voice quality is quite impressive, don't you think?";
+    let test_text = "Hello! This is AKI testing ElevenLabs text to speech. The voice quality is quite impressive, don't you think?";
     let temp_path = std::env::temp_dir().join("astral_elevenlabs_test.mp3");
     let temp_path_str = temp_path.to_string_lossy().to_string();
     

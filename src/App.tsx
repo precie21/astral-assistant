@@ -20,6 +20,43 @@ function App() {
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animationFrameRef = useRef<number | null>(null);
 
+    // Load settings on startup
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const settings: any = await invoke('load_settings');
+                console.log('Loaded settings:', settings);
+                setUseWhisper(settings.whisper_enabled);
+                
+                // Apply other settings (TTS, LLM, etc.)
+                if (settings.elevenlabs_enabled && settings.elevenlabs_api_key) {
+                    await invoke('elevenlabs_update_config', {
+                        config: {
+                            api_key: settings.elevenlabs_api_key,
+                            voice_id: settings.elevenlabs_voice_id,
+                            model_id: settings.elevenlabs_model_id,
+                            enabled: settings.elevenlabs_enabled
+                        }
+                    });
+                }
+                
+                if (settings.whisper_enabled) {
+                    await invoke('whisper_update_config', {
+                        config: {
+                            server_url: settings.whisper_server_url,
+                            model: settings.whisper_model,
+                            enabled: settings.whisper_enabled
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        };
+        
+        loadSettings();
+    }, []);
+
     const monitorAudioLevel = () => {
         if (!analyserRef.current) return;
         
@@ -432,14 +469,23 @@ function App() {
             else if (lowerCommand.includes('weather')) {
                 response = "Weather integration coming soon. I'll be able to tell you the current weather conditions.";
             }
-            // Open applications
-            else if (lowerCommand.includes('open')) {
-                const app = lowerCommand.replace('open', '').trim();
-                response = `Opening ${app}`;
+            // Open/Launch applications
+            else if (lowerCommand.includes('open') || lowerCommand.includes('launch') || lowerCommand.includes('start')) {
+                // Extract app name
+                let appName = lowerCommand
+                    .replace(/^(open|launch|start)\s+/i, '')
+                    .replace(/\s+(please|for me|app|application)$/i, '')
+                    .trim();
+                
                 try {
-                    await invoke("execute_command", { command: `open:${app}` });
+                    const result: any = await invoke("launch_application", { appName });
+                    if (result.success) {
+                        response = `Launched ${result.app_name}`;
+                    } else {
+                        response = `I couldn't find or launch ${appName}`;
+                    }
                 } catch (error) {
-                    response = `I couldn't open ${app}. This feature is still in development.`;
+                    response = `I couldn't launch ${appName}. ${error}`;
                 }
             }
             // System info (but not if asking about AI systems)

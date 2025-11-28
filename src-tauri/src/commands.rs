@@ -44,7 +44,7 @@ pub async fn initialize_assistant() -> Result<String, String> {
     // Automation manager is already initialized via Lazy
     info!("ASTRAL initialization complete");
     
-    Ok("ASTRAL initialized successfully - Wake word: 'Hey ASTRAL', LLM: Local Ollama, Automation: Active".to_string())
+    Ok("AKI initialized successfully - Wake word: 'Hey AKI', LLM: Local Ollama, Automation: Active".to_string())
 }
 
 /// Get current system information

@@ -13,7 +13,7 @@ export default function SystemTray({ onToggleDashboard, assistantState }: System
                             assistantState === 'thinking' ? 'bg-cyber-purple animate-pulse' :
                                 'bg-cyber-pink animate-pulse'
                     }`} />
-                <span className="text-xs font-medium">ASTRAL</span>
+                <span className="text-xs font-medium">AKI</span>
             </div>
 
             {/* Dashboard toggle */}
