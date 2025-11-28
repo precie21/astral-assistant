@@ -31,7 +31,7 @@ impl Default for LLMConfig {
         Self {
             provider: LLMProvider::Ollama, // Default to local Ollama
             api_key: None,
-            model: "llama2".to_string(),
+            model: "mistral:latest".to_string(),
             temperature: 0.7,
             max_tokens: 500,
             ollama_url: Some("http://localhost:11434".to_string()),
