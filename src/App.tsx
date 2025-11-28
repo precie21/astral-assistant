@@ -111,21 +111,23 @@ function App() {
             
             if (config.enabled) {
                 console.log('Using ElevenLabs TTS');
-                const audioPath: string = await invoke("elevenlabs_speak", { text });
-                console.log('ElevenLabs generated audio at:', audioPath);
+                const audioBytes: number[] = await invoke("elevenlabs_speak", { text });
+                console.log('ElevenLabs generated audio:', audioBytes.length, 'bytes');
                 
-                // Convert file path to Tauri asset protocol
-                const { convertFileSrc } = await import('@tauri-apps/api/core');
-                const assetUrl = convertFileSrc(audioPath);
+                // Convert bytes to Blob and create URL
+                const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
                 
-                // Play the audio file
-                const audio = new Audio(assetUrl);
+                // Play the audio
+                const audio = new Audio(audioUrl);
                 audio.onended = () => {
                     console.log('ElevenLabs speech ended');
+                    URL.revokeObjectURL(audioUrl); // Clean up
                     setAssistantState('idle');
                 };
                 audio.onerror = (e) => {
                     console.error('ElevenLabs audio playback error:', e);
+                    URL.revokeObjectURL(audioUrl); // Clean up
                     console.log('Falling back to browser TTS');
                     speakWithBrowser(text);
                 };

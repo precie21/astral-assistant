@@ -129,16 +129,11 @@ static TTS_ENGINE: Lazy<Mutex<ElevenLabsEngine>> = Lazy::new(|| {
 // Tauri commands
 
 #[tauri::command]
-pub async fn elevenlabs_speak(text: String) -> Result<String, String> {
+pub async fn elevenlabs_speak(text: String) -> Result<Vec<u8>, String> {
     let engine = TTS_ENGINE.lock().await;
     
-    // Generate to temp file
-    let temp_path = std::env::temp_dir().join("astral_elevenlabs_speech.mp3");
-    let temp_path_str = temp_path.to_string_lossy().to_string();
-    
-    engine.generate_speech_to_file(&text, &temp_path_str).await?;
-    
-    Ok(temp_path_str)
+    // Return audio bytes directly instead of file path
+    engine.generate_speech(&text).await
 }
 
 #[tauri::command]
