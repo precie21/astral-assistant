@@ -193,8 +193,8 @@ function App() {
                     response = `I couldn't open ${app}. This feature is still in development.`;
                 }
             }
-            // System info
-            else if (lowerCommand.includes('system') || lowerCommand.includes('stats')) {
+            // System info (but not if asking about AI systems)
+            else if ((lowerCommand.includes('system') || lowerCommand.includes('stats')) && !lowerCommand.includes('ai')) {
                 try {
                     const info: any = await invoke("get_system_info");
                     response = `CPU usage is ${info.cpu_usage}%, Memory: ${Math.round(info.memory_used / 1024 / 1024 / 1024)} gigabytes used`;
@@ -212,7 +212,7 @@ function App() {
                 response = "I can tell you the time, date, open applications, check system stats, run automation routines like work mode or gaming mode, and control your dashboard. I also have AI capabilities for complex questions. Try saying 'start work mode' or 'what time is it'";
             }
             // For complex queries, use LLM
-            else if (lowerCommand.length > 20 || lowerCommand.includes('why') || lowerCommand.includes('how') || lowerCommand.includes('explain')) {
+            else if (lowerCommand.length > 15 || lowerCommand.includes('why') || lowerCommand.includes('how') || lowerCommand.includes('explain') || lowerCommand.includes('what is') || lowerCommand.includes('what\'s') || lowerCommand.includes('calculate') || lowerCommand.includes('*') || lowerCommand.includes('+') || lowerCommand.includes('-') || lowerCommand.includes('/')) {
                 try {
                     const llmResponse: any = await invoke("send_llm_message", { message: command });
                     response = llmResponse.content;
