@@ -1,7 +1,7 @@
 // System Integration Module
 // Handles Windows API interactions and system-level operations
 
-use log::{info, error};
+use log::info;
 use anyhow::Result;
 
 #[cfg(target_os = "windows")]
@@ -35,18 +35,24 @@ fn get_cpu_usage() -> f32 {
     0.0
 }
 
+    Ok(())
+}
+
+#[allow(dead_code)]
 pub async fn launch_application(app_name: &str) -> Result<()> {
     info!("Launching application: {}", app_name);
     // TODO: Implement application launching
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn control_media(action: &str) -> Result<()> {
     info!("Media control: {}", action);
     // TODO: Implement media control (play/pause/next/prev)
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn search_files(query: &str) -> Result<Vec<String>> {
     info!("Searching files: {}", query);
     // TODO: Implement file search

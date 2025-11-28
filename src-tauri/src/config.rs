@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use anyhow::Result;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub wake_word: String,
@@ -15,6 +16,7 @@ pub struct Config {
     pub theme: Theme,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum VoiceProvider {
     ElevenLabs,
@@ -22,6 +24,7 @@ pub enum VoiceProvider {
     Piper,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum LLMProvider {
     OpenAI,
@@ -29,6 +32,7 @@ pub enum LLMProvider {
     Ollama,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Theme {
     Dark,

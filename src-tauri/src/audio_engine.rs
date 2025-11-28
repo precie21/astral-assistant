@@ -1,8 +1,9 @@
 // Audio Engine Module
 // Handles wake word detection, STT, TTS, and audio processing
 
-use log::{info, error};
+use log::info;
 
+#[allow(dead_code)]
 pub struct AudioEngine {
     // TODO: Add Porcupine wake word detector
     // TODO: Add Whisper STT engine
@@ -23,7 +24,7 @@ impl AudioEngine {
         Ok(())
     }
 
-    pub async fn transcribe_audio(&self, audio_data: Vec<f32>) -> Result<String, anyhow::Error> {
+    pub async fn transcribe_audio(&self, _audio_data: Vec<f32>) -> Result<String, anyhow::Error> {
         info!("Transcribing audio...");
         // TODO: Use Whisper.cpp for local STT
         // TODO: Fallback to cloud STT if needed
