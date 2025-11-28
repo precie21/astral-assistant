@@ -101,44 +101,9 @@ function App() {
         }
     };
 
-    const speak = async (text: string) => {
+    const speak = (text: string) => {
         console.log('Speaking:', text);
         setAssistantState('speaking');
-        
-        try {
-            // Try Piper TTS first
-            const ttsConfig: any = await invoke("get_tts_config");
-            
-            if (ttsConfig.use_piper) {
-                console.log('Using Piper TTS, config:', ttsConfig);
-                const audioPath: string = await invoke("speak_with_piper", { text });
-                console.log('Piper generated audio at:', audioPath);
-                
-                // Convert file path to Tauri asset protocol
-                const { convertFileSrc } = await import('@tauri-apps/api/core');
-                const assetUrl = convertFileSrc(audioPath);
-                console.log('Asset URL:', assetUrl);
-                
-                // Play the audio file
-                const audio = new Audio(assetUrl);
-                audio.onended = () => {
-                    console.log('Piper speech ended');
-                    setAssistantState('idle');
-                };
-                audio.onerror = (e) => {
-                    console.error('Piper audio playback error:', e);
-                    console.error('Falling back to browser TTS');
-                    speakWithBrowser(text);
-                };
-                await audio.play();
-                return;
-            }
-        } catch (error) {
-            console.error('Piper TTS error:', error);
-            console.log('Falling back to browser TTS');
-        }
-        
-        // Fallback to browser TTS
         speakWithBrowser(text);
     };
     

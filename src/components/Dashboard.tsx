@@ -202,26 +202,6 @@ function SettingsTab() {
     });
     const [llmProvider, setLlmProvider] = useState('Ollama');
     const [showApiKey, setShowApiKey] = useState(false);
-    const [piperEnabled, setPiperEnabled] = useState(false);
-    const [voiceModel, setVoiceModel] = useState('en_GB-jenny_dioco-medium');
-    const [speakingRate, setSpeakingRate] = useState(1.0);
-
-    useEffect(() => {
-        loadTtsConfig();
-    }, []);
-
-    const loadTtsConfig = async () => {
-        try {
-            const { invoke } = await import('@tauri-apps/api/core');
-            const config: any = await invoke('get_tts_config');
-            setPiperEnabled(config.use_piper);
-            setVoiceModel(config.voice_model);
-            setSpeakingRate(config.speaking_rate);
-            console.log('Loaded TTS config:', config);
-        } catch (error) {
-            console.error('Failed to load TTS config:', error);
-        }
-    };
 
     const toggleSetting = (key: keyof typeof settings) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -292,110 +272,11 @@ function SettingsTab() {
             <div className="glass p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings</h3>
                 <div className="space-y-3">
-                    <ToggleItem 
-                        label="Use Piper TTS (Natural Voice)" 
-                        enabled={piperEnabled}
-                        onToggle={async () => {
-                            const newState = !piperEnabled;
-                            setPiperEnabled(newState);
-                            try {
-                                const { invoke } = await import('@tauri-apps/api/core');
-                                await invoke('update_tts_config', {
-                                    config: {
-                                        voice_model: voiceModel,
-                                        voice_model_path: `${voiceModel}.onnx`,
-                                        piper_executable: 'piper.exe',
-                                        speaking_rate: speakingRate,
-                                        use_piper: newState
-                                    }
-                                });
-                                console.log('Piper TTS', newState ? 'enabled' : 'disabled');
-                            } catch (error) {
-                                console.error('Failed to update TTS config:', error);
-                                alert('Failed to update TTS settings: ' + error);
-                            }
-                        }}
-                    />
-                    <div>
-                        <label className="text-xs text-white/50 block mb-1">Voice Model</label>
-                        <select 
-                            className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-sm"
-                            value={voiceModel}
-                            onChange={async (e) => {
-                                const newModel = e.target.value;
-                                setVoiceModel(newModel);
-                                try {
-                                    const { invoke } = await import('@tauri-apps/api/core');
-                                    await invoke('update_tts_config', {
-                                        config: {
-                                            voice_model: newModel,
-                                            voice_model_path: `${newModel}.onnx`,
-                                            piper_executable: 'piper.exe',
-                                            speaking_rate: speakingRate,
-                                            use_piper: piperEnabled
-                                        }
-                                    });
-                                } catch (error) {
-                                    console.error('Failed to update voice model:', error);
-                                }
-                            }}
-                        >
-                            <option value="en_GB-jenny_dioco-medium">British Female (Jenny)</option>
-                            <option value="en_GB-alba-medium">British Female (Alba)</option>
-                            <option value="en_GB-northern_english_male-medium">British Male (Northern)</option>
-                            <option value="en_US-amy-medium">American Female (Amy)</option>
-                        </select>
+                    <div className="text-sm text-white/70">
+                        Currently using browser TTS (default)
                     </div>
-                    <div>
-                        <label className="text-xs text-white/50 block mb-1">Speaking Speed: {speakingRate.toFixed(1)}x</label>
-                        <input 
-                            type="range" 
-                            min="0.5" 
-                            max="2" 
-                            step="0.1" 
-                            value={speakingRate}
-                            onChange={async (e) => {
-                                const newRate = parseFloat(e.target.value);
-                                setSpeakingRate(newRate);
-                                try {
-                                    const { invoke } = await import('@tauri-apps/api/core');
-                                    await invoke('update_tts_config', {
-                                        config: {
-                                            voice_model: voiceModel,
-                                            voice_model_path: `${voiceModel}.onnx`,
-                                            piper_executable: 'piper.exe',
-                                            speaking_rate: newRate,
-                                            use_piper: piperEnabled
-                                        }
-                                    });
-                                } catch (error) {
-                                    console.error('Failed to update speaking rate:', error);
-                                }
-                            }}
-                            className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-white/40 mt-1">
-                            <span>Slow</span>
-                            <span>Normal</span>
-                            <span>Fast</span>
-                        </div>
-                    </div>
-                    <button 
-                        className="w-full cyber-button text-sm"
-                        onClick={async () => {
-                            try {
-                                const { invoke } = await import('@tauri-apps/api/core');
-                                const result: string = await invoke('test_piper_tts');
-                                alert(result);
-                            } catch (error) {
-                                alert('Test failed: ' + error);
-                            }
-                        }}
-                    >
-                        Test Voice
-                    </button>
                     <div className="text-xs text-white/50 bg-cyber-purple/10 border border-cyber-purple/30 rounded p-2">
-                        ℹ️ Run install-piper.ps1 to setup. Piper files go in src-tauri/resources/
+                        ℹ️ Advanced TTS options coming soon (GPT-SoVITS, ElevenLabs, etc.)
                     </div>
                 </div>
             </div>
