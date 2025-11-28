@@ -57,6 +57,29 @@ function App() {
         loadSettings();
     }, []);
 
+    // Wake word detection effect
+    useEffect(() => {
+        const setupWakeWordListener = async () => {
+            try {
+                const config: any = await invoke('get_wake_word_config');
+                if (config.enabled) {
+                    console.log('[WAKE_WORD] Wake word detection enabled');
+                    // Start continuous background listening
+                    await invoke('start_wake_word_detection');
+                }
+            } catch (error) {
+                console.error('Failed to setup wake word:', error);
+            }
+        };
+
+        setupWakeWordListener();
+
+        return () => {
+            // Cleanup: stop wake word detection when component unmounts
+            invoke('stop_wake_word_detection').catch(console.error);
+        };
+    }, []);
+
     const monitorAudioLevel = () => {
         if (!analyserRef.current) return;
         

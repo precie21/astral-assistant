@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tauri::Emitter;
+use tauri::{Emitter, AppHandle, Manager};
+use tokio::time::{Duration, sleep};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WakeWordConfig {
@@ -21,8 +23,9 @@ impl Default for WakeWordConfig {
 
 lazy_static::lazy_static! {
     static ref WAKE_WORD_CONFIG: Arc<Mutex<WakeWordConfig>> = Arc::new(Mutex::new(WakeWordConfig::default()));
-    static ref WAKE_WORD_ACTIVE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
+
+static WAKE_WORD_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub async fn get_wake_word_config() -> Result<WakeWordConfig, String> {
@@ -38,41 +41,73 @@ pub async fn update_wake_word_config(config: WakeWordConfig) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub async fn start_wake_word_detection() -> Result<(), String> {
-    let mut active = WAKE_WORD_ACTIVE.lock().map_err(|e| e.to_string())?;
-    
-    if *active {
+pub async fn start_wake_word_detection(app: AppHandle) -> Result<(), String> {
+    if WAKE_WORD_ACTIVE.load(Ordering::Relaxed) {
         return Err("Wake word detection already running".to_string());
     }
     
-    *active = true;
+    WAKE_WORD_ACTIVE.store(true, Ordering::Relaxed);
     
-    // In a real implementation, you would:
-    // 1. Start audio capture in a background thread
-    // 2. Buffer small chunks of audio (e.g., 1-2 seconds)
-    // 3. Use a lightweight model or simple pattern matching to detect the wake word
-    // 4. When detected, emit a Tauri event to trigger the main listening UI
-    
-    // For now, this is a placeholder that would integrate with:
-    // - Porcupine wake word detection (commercial but good)
-    // - Snowboy (deprecated but still works)
-    // - Custom Whisper-based detection (heavier but flexible)
-    // - Simple pattern matching on Whisper transcriptions
+    // Spawn background task for continuous listening
+    tokio::spawn(async move {
+        println!("[WAKE_WORD] Starting continuous listening for 'hey aki'...");
+        
+        while WAKE_WORD_ACTIVE.load(Ordering::Relaxed) {
+            // Check Whisper config
+            let whisper_config = match crate::whisper_stt::get_whisper_config().await {
+                Ok(cfg) => cfg,
+                Err(_) => {
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            };
+            
+            if !whisper_config.enabled {
+                println!("[WAKE_WORD] Whisper not enabled, sleeping...");
+                sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+            
+            // NOTE: This is a simplified implementation
+            // In production, you would:
+            // 1. Continuously capture audio in 2-second chunks
+            // 2. Send each chunk to Whisper for transcription
+            // 3. Check if transcription contains "hey aki"
+            // 4. Emit event when detected
+            
+            // For now, just check every 3 seconds if wake word would be detected
+            // You'll need to integrate actual audio capture here
+            
+            println!("[WAKE_WORD] Monitoring... (waiting for frontend audio integration)");
+            sleep(Duration::from_secs(3)).await;
+        }
+        
+        println!("[WAKE_WORD] Stopped continuous listening");
+    });
     
     Ok(())
 }
 
 #[tauri::command]
 pub async fn stop_wake_word_detection() -> Result<(), String> {
-    let mut active = WAKE_WORD_ACTIVE.lock().map_err(|e| e.to_string())?;
-    *active = false;
+    WAKE_WORD_ACTIVE.store(false, Ordering::Relaxed);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn is_wake_word_active() -> Result<bool, String> {
-    let active = WAKE_WORD_ACTIVE.lock().map_err(|e| e.to_string())?;
-    Ok(*active)
+    Ok(WAKE_WORD_ACTIVE.load(Ordering::Relaxed))
+}
+
+// Check if text contains wake word phrase
+pub fn contains_wake_word(text: &str, wake_phrase: &str) -> bool {
+    let text_lower = text.to_lowercase();
+    let phrase_lower = wake_phrase.to_lowercase();
+    
+    // Check for exact match or phrase within text
+    text_lower.contains(&phrase_lower) || 
+    // Also check without spaces (e.g., "heyaki")
+    text_lower.replace(" ", "").contains(&phrase_lower.replace(" ", ""))
 }
 
 // Simulated wake word detection function
@@ -90,6 +125,24 @@ pub fn detect_wake_word_in_audio(_audio_data: &[f32], _phrase: &str, _sensitivit
     // - Simple keyword spotting algorithms
     
     false
+}
+
+#[tauri::command]
+pub async fn check_for_wake_word(text: String, app: AppHandle) -> Result<bool, String> {
+    let config = WAKE_WORD_CONFIG.lock().map_err(|e| e.to_string())?;
+    
+    if !config.enabled {
+        return Ok(false);
+    }
+    
+    let detected = contains_wake_word(&text, &config.phrase);
+    
+    if detected {
+        println!("[WAKE_WORD] Detected: '{}' in text: '{}'", config.phrase, text);
+        app.emit("wake-word-detected", ()).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(detected)
 }
 
 // Helper function to emit wake word detected event

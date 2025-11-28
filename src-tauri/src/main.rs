@@ -73,6 +73,7 @@ fn main() {
             start_wake_word_detection,
             stop_wake_word_detection,
             is_wake_word_active,
+            check_for_wake_word,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");
