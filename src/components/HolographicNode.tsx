@@ -6,6 +6,7 @@ import * as THREE from 'three';
 interface HolographicNodeProps {
     state: 'idle' | 'listening' | 'thinking' | 'speaking';
     isListening: boolean;
+    onActivate: () => void;
 }
 
 function HolographicOrb({ state }: { state: string }) {
@@ -76,12 +77,12 @@ function HolographicOrb({ state }: { state: string }) {
     );
 }
 
-export default function HolographicNode({ state, isListening }: HolographicNodeProps) {
+export default function HolographicNode({ state, isListening, onActivate }: HolographicNodeProps) {
     const [isHovered, setIsHovered] = useState(false);
 
     const handleClick = () => {
-        console.log('Orb clicked - voice recording will be implemented');
-        // TODO: Implement voice recording
+        console.log('Orb clicked - starting voice recognition');
+        onActivate();
     };
 
     return (
