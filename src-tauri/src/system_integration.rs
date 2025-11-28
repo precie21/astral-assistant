@@ -35,9 +35,6 @@ fn get_cpu_usage() -> f32 {
     0.0
 }
 
-    Ok(())
-}
-
 #[allow(dead_code)]
 pub async fn launch_application(app_name: &str) -> Result<()> {
     info!("Launching application: {}", app_name);
