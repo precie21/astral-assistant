@@ -7,9 +7,10 @@ interface HolographicNodeProps {
     state: 'idle' | 'listening' | 'thinking' | 'speaking';
     isListening: boolean;
     onActivate: () => void;
+    audioLevel?: number; // 0-1 range
 }
 
-function HolographicOrb({ state }: { state: string }) {
+function HolographicOrb({ state, audioLevel = 0 }: { state: string; audioLevel?: number }) {
     const meshRef = useRef<THREE.Mesh>(null);
     const materialRef = useRef<THREE.ShaderMaterial>(null);
 
@@ -17,10 +18,17 @@ function HolographicOrb({ state }: { state: string }) {
         if (meshRef.current) {
             meshRef.current.rotation.y += 0.005;
             meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.5) * 0.1;
+            
+            // Pulsate based on audio level
+            const baseScale = 1;
+            const pulseAmount = audioLevel * 0.3; // Max 30% size increase
+            const scale = baseScale + pulseAmount;
+            meshRef.current.scale.set(scale, scale, scale);
         }
 
         if (materialRef.current) {
             materialRef.current.uniforms.time.value = state.clock.elapsedTime;
+            materialRef.current.uniforms.audioLevel.value = audioLevel;
         }
     });
 
@@ -39,6 +47,7 @@ function HolographicOrb({ state }: { state: string }) {
     uniform float time;
     uniform vec3 color1;
     uniform vec3 color2;
+    uniform float audioLevel;
     varying vec3 vNormal;
     varying vec3 vPosition;
     
@@ -47,18 +56,26 @@ function HolographicOrb({ state }: { state: string }) {
       vec3 viewDirection = normalize(cameraPosition - vPosition);
       float fresnel = pow(1.0 - dot(viewDirection, vNormal), 3.0);
       
-      // Animated color shift
-      vec3 color = mix(color1, color2, sin(time * 0.5 + vPosition.y) * 0.5 + 0.5);
+      // Animated color shift with audio reactivity
+      float colorMix = sin(time * 0.5 + vPosition.y) * 0.5 + 0.5;
+      colorMix = mix(colorMix, 1.0, audioLevel * 0.5); // More color2 when audio is loud
+      vec3 color = mix(color1, color2, colorMix);
       
-      // Holographic glow
-      float glow = fresnel * (sin(time * 2.0) * 0.3 + 0.7);
+      // Holographic glow with audio boost
+      float baseGlow = sin(time * 2.0) * 0.3 + 0.7;
+      float audioGlow = audioLevel * 0.5;
+      float glow = fresnel * (baseGlow + audioGlow);
       
-      gl_FragColor = vec4(color * glow, fresnel * 0.8);
+      // Brightness increases with audio
+      float brightness = 1.0 + (audioLevel * 0.5);
+      
+      gl_FragColor = vec4(color * glow * brightness, fresnel * 0.8);
     }
   `;
 
     const uniforms = {
         time: { value: 0 },
+        audioLevel: { value: 0 },
         color1: { value: new THREE.Color(0x00f0ff) }, // Cyan
         color2: { value: new THREE.Color(0xb24bf3) }, // Purple
     };
@@ -77,7 +94,7 @@ function HolographicOrb({ state }: { state: string }) {
     );
 }
 
-export default function HolographicNode({ state, isListening, onActivate }: HolographicNodeProps) {
+export default function HolographicNode({ state, isListening, onActivate, audioLevel = 0 }: HolographicNodeProps) {
     const [isHovered, setIsHovered] = useState(false);
 
     const handleClick = () => {
@@ -95,7 +112,7 @@ export default function HolographicNode({ state, isListening, onActivate }: Holo
             <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
                 <ambientLight intensity={0.5} />
                 <pointLight position={[10, 10, 10]} intensity={1} />
-                <HolographicOrb state={state} />
+                <HolographicOrb state={state} audioLevel={audioLevel} />
                 <OrbitControls enableZoom={false} enablePan={false} />
             </Canvas>
 

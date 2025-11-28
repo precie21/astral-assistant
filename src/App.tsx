@@ -15,6 +15,24 @@ function App() {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const [useWhisper, setUseWhisper] = useState(false);
+    const [audioLevel, setAudioLevel] = useState(0);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+
+    const monitorAudioLevel = () => {
+        if (!analyserRef.current) return;
+        
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        // Calculate RMS for audio level
+        const rms = Math.sqrt(dataArray.reduce((sum, val) => sum + val * val, 0) / dataArray.length);
+        const normalized = Math.min(rms / 128, 1); // Normalize to 0-1
+        
+        setAudioLevel(normalized);
+        animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
+    };
 
     useEffect(() => {
         // Initialize the assistant on mount (only once)
@@ -113,6 +131,14 @@ function App() {
             console.log("Stopping Whisper recording...");
             mediaRecorderRef.current.stop();
             setIsListening(false);
+            
+            // Stop audio monitoring
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+            setAudioLevel(0);
+            
             return;
         }
         
@@ -125,6 +151,16 @@ function App() {
             try {
                 console.log("Starting Whisper recording...");
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Setup audio analysis for visualization
+                audioContextRef.current = new AudioContext();
+                const source = audioContextRef.current.createMediaStreamSource(stream);
+                analyserRef.current = audioContextRef.current.createAnalyser();
+                analyserRef.current.fftSize = 256;
+                source.connect(analyserRef.current);
+                
+                // Start audio level monitoring
+                monitorAudioLevel();
                 
                 const options = { mimeType: 'audio/webm' };
                 mediaRecorderRef.current = new MediaRecorder(stream, options);
@@ -468,6 +504,7 @@ function App() {
                 state={assistantState}
                 isListening={isListening}
                 onActivate={startListening}
+                audioLevel={audioLevel}
             />
 
             {/* Dashboard Panel */}
