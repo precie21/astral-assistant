@@ -1,7 +1,7 @@
 // LLM Provider Module
 // Handles integration with multiple LLM providers (OpenAI, Claude, Ollama)
 
-use log::{info, warn, error};
+use log::{info, warn};
 use anyhow::{Result, Context, bail};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use log::info;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use once_cell::sync::Lazy;
 
 use crate::llm_provider::{LLMManager, LLMConfig, LLMResponse};
@@ -34,12 +34,12 @@ pub async fn initialize_assistant() -> Result<String, String> {
         Err(e) => info!("Wake word detection not started: {}", e),
     }
     
-    *AUDIO_ENGINE.lock().unwrap() = Some(audio_engine);
+    *AUDIO_ENGINE.lock().await = Some(audio_engine);
     
     // Initialize LLM with default config (Ollama local)
     let llm_config = LLMConfig::default();
     let llm_manager = LLMManager::new(llm_config);
-    *LLM_MANAGER.lock().unwrap() = Some(llm_manager);
+    *LLM_MANAGER.lock().await = Some(llm_manager);
     
     // Automation manager is already initialized via Lazy
     info!("ASTRAL initialization complete");
@@ -80,7 +80,7 @@ pub async fn execute_command(command: String) -> Result<String, String> {
     
     // Handle automation trigger phrases
     if lower.contains("work mode") || lower.contains("start work") {
-        let mut automation = AUTOMATION_MANAGER.lock().unwrap();
+        let mut automation = AUTOMATION_MANAGER.lock().await;
         match automation.execute_routine("work-mode").await {
             Ok(_) => return Ok("Work mode activated!".to_string()),
             Err(e) => return Ok(format!("Failed to start work mode: {}", e)),
@@ -88,7 +88,7 @@ pub async fn execute_command(command: String) -> Result<String, String> {
     }
     
     if lower.contains("gaming mode") || lower.contains("start gaming") {
-        let mut automation = AUTOMATION_MANAGER.lock().unwrap();
+        let mut automation = AUTOMATION_MANAGER.lock().await;
         match automation.execute_routine("gaming-mode").await {
             Ok(_) => return Ok("Gaming mode activated!".to_string()),
             Err(e) => return Ok(format!("Failed to start gaming mode: {}", e)),
@@ -96,7 +96,8 @@ pub async fn execute_command(command: String) -> Result<String, String> {
     }
     
     // For complex queries, route to LLM
-    if let Some(llm_manager) = LLM_MANAGER.lock().unwrap().as_mut() {
+    let mut manager_guard = LLM_MANAGER.lock().await;
+    if let Some(llm_manager) = manager_guard.as_mut() {
         match llm_manager.send_message(&command).await {
             Ok(response) => Ok(response.content),
             Err(e) => {
@@ -115,7 +116,7 @@ pub async fn execute_command(command: String) -> Result<String, String> {
 pub async fn send_llm_message(message: String) -> Result<LLMResponse, String> {
     info!("Sending message to LLM: {}", message);
     
-    let mut manager_guard = LLM_MANAGER.lock().unwrap();
+    let mut manager_guard = LLM_MANAGER.lock().await;
     
     if manager_guard.is_none() {
         *manager_guard = Some(LLMManager::new(LLMConfig::default()));
@@ -135,10 +136,10 @@ pub fn get_llm_config() -> Result<LLMConfig, String> {
 }
 
 #[tauri::command]
-pub fn update_llm_config(config: LLMConfig) -> Result<String, String> {
+pub async fn update_llm_config(config: LLMConfig) -> Result<String, String> {
     info!("Updating LLM config: {:?}", config.provider);
     
-    let mut manager_guard = LLM_MANAGER.lock().unwrap();
+    let mut manager_guard = LLM_MANAGER.lock().await;
     
     if let Some(manager) = manager_guard.as_mut() {
         manager.update_config(config.clone());
@@ -159,8 +160,8 @@ pub async fn test_llm_connection(config: LLMConfig) -> Result<bool, String> {
 // ===== Automation Commands =====
 
 #[tauri::command]
-pub fn get_automation_routines() -> Result<Vec<AutomationRoutine>, String> {
-    let manager = AUTOMATION_MANAGER.lock().unwrap();
+pub async fn get_automation_routines() -> Result<Vec<AutomationRoutine>, String> {
+    let manager = AUTOMATION_MANAGER.lock().await;
     Ok(manager.get_all_routines())
 }
 
@@ -168,17 +169,17 @@ pub fn get_automation_routines() -> Result<Vec<AutomationRoutine>, String> {
 pub async fn execute_automation(routine_id: String) -> Result<AutomationResult, String> {
     info!("Executing automation: {}", routine_id);
     
-    let mut manager = AUTOMATION_MANAGER.lock().unwrap();
+    let mut manager = AUTOMATION_MANAGER.lock().await;
     manager.execute_routine(&routine_id)
         .await
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn toggle_automation(routine_id: String) -> Result<bool, String> {
+pub async fn toggle_automation(routine_id: String) -> Result<bool, String> {
     info!("Toggling automation: {}", routine_id);
     
-    let mut manager = AUTOMATION_MANAGER.lock().unwrap();
+    let mut manager = AUTOMATION_MANAGER.lock().await;
     manager.toggle_routine(&routine_id)
         .map_err(|e| e.to_string())
 }
@@ -189,7 +190,7 @@ pub fn toggle_automation(routine_id: String) -> Result<bool, String> {
 pub async fn trigger_wake_word() -> Result<String, String> {
     info!("Manually triggering wake word");
     
-    let engine_guard = AUDIO_ENGINE.lock().unwrap();
+    let engine_guard = AUDIO_ENGINE.lock().await;
     
     if let Some(engine) = engine_guard.as_ref() {
         engine.trigger_wake_word()

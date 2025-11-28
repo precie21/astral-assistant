@@ -1,7 +1,7 @@
 // Audio Engine Module
 // Handles wake word detection, STT, TTS, and audio processing
 
-use log::{info, warn, error};
+use log::{info, warn};
 use anyhow::{Result, Context};
 use tokio::sync::mpsc;
 use std::sync::Arc;
@@ -187,7 +187,7 @@ pub async fn init_audio_capture() -> Result<()> {
 
 /// Process audio buffer for wake word detection
 #[allow(dead_code)]
-pub fn process_audio_buffer(buffer: &[f32]) -> Option<WakeWordDetection> {
+pub fn process_audio_buffer(_buffer: &[f32]) -> Option<WakeWordDetection> {
     // In production: Pass buffer to Porcupine wake word engine
     // let porcupine = Porcupine::new(access_key, keyword_paths, sensitivities)?;
     // let keyword_index = porcupine.process(buffer)?;
