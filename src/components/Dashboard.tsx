@@ -272,9 +272,46 @@ function SettingsTab() {
             <div className="glass p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings</h3>
                 <div className="space-y-3">
-                    <SettingItem label="Wake Word" value="Hey ASTRAL" />
-                    <SettingItem label="Voice" value="British (Male)" />
-                    <SettingItem label="Speech Speed" value="Normal" />
+                    <ToggleItem 
+                        label="Use Piper TTS (Natural Voice)" 
+                        enabled={settings.localProcessing}
+                        onToggle={() => {
+                            toggleSetting('localProcessing');
+                            // TODO: Call update_tts_config command
+                        }}
+                    />
+                    <div>
+                        <label className="text-xs text-white/50 block mb-1">Voice Model</label>
+                        <select className="w-full bg-white/10 border border-white/20 rounded px-3 py-2 text-sm">
+                            <option value="browser">Browser TTS (Default)</option>
+                            <option value="en_GB-jenny_dioco-medium">British Female (Jenny)</option>
+                            <option value="en_GB-alba-medium">British Female (Alba)</option>
+                            <option value="en_GB-northern_english_male-medium">British Male (Northern)</option>
+                            <option value="en_US-amy-medium">American Female (Amy)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-white/50 block mb-1">Speaking Speed</label>
+                        <input 
+                            type="range" 
+                            min="0.5" 
+                            max="2" 
+                            step="0.1" 
+                            defaultValue="1.0"
+                            className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-white/40 mt-1">
+                            <span>Slow</span>
+                            <span>Normal</span>
+                            <span>Fast</span>
+                        </div>
+                    </div>
+                    <button className="w-full cyber-button text-sm">
+                        Test Voice
+                    </button>
+                    <div className="text-xs text-white/50 bg-cyber-purple/10 border border-cyber-purple/30 rounded p-2">
+                        ℹ️ Piper TTS requires setup. See <a href="#" className="text-cyber-purple underline">PIPER_TTS_SETUP.md</a>
+                    </div>
                 </div>
             </div>
 

@@ -101,8 +101,40 @@ function App() {
         }
     };
 
-    const speak = (text: string) => {
+    const speak = async (text: string) => {
         console.log('Speaking:', text);
+        setAssistantState('speaking');
+        
+        try {
+            // Try Piper TTS first
+            const ttsConfig: any = await invoke("get_tts_config");
+            
+            if (ttsConfig.use_piper) {
+                console.log('Using Piper TTS');
+                const audioPath: string = await invoke("speak_with_piper", { text });
+                
+                // Play the audio file
+                const audio = new Audio(`file://${audioPath}`);
+                audio.onended = () => {
+                    console.log('Piper speech ended');
+                    setAssistantState('idle');
+                };
+                audio.onerror = () => {
+                    console.error('Piper audio playback error, falling back to browser TTS');
+                    speakWithBrowser(text);
+                };
+                await audio.play();
+                return;
+            }
+        } catch (error) {
+            console.log('Piper TTS not available, using browser TTS:', error);
+        }
+        
+        // Fallback to browser TTS
+        speakWithBrowser(text);
+    };
+    
+    const speakWithBrowser = (text: string) => {
         if (synthRef.current) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.rate = 1.0;
@@ -110,21 +142,22 @@ function App() {
             utterance.volume = 1.0;
             
             utterance.onstart = () => {
-                console.log('Speech started');
+                console.log('Browser speech started');
                 setAssistantState('speaking');
             };
             utterance.onend = () => {
-                console.log('Speech ended');
+                console.log('Browser speech ended');
                 setAssistantState('idle');
             };
             utterance.onerror = (event) => {
-                console.error('Speech error:', event);
+                console.error('Browser speech error:', event);
                 setAssistantState('idle');
             };
             
             synthRef.current.speak(utterance);
         } else {
             console.error('Speech synthesis not available');
+            setAssistantState('idle');
         }
     };
 
@@ -230,9 +263,15 @@ function App() {
                     response = "I'm having trouble connecting to my AI brain right now. Make sure Ollama is running with 'ollama serve' or configure an API key in settings.";
                 }
             }
-            // Default
+            // Default - route everything else to AI for creative interpretation
             else {
-                response = "I'm not sure how to help with that yet. Try asking about the time, date, system stats, or say 'help' for more options. For complex questions, I can use my AI capabilities.";
+                try {
+                    const llmResponse: any = await invoke("send_llm_message", { message: command });
+                    response = llmResponse.content;
+                } catch (error) {
+                    // Only if AI completely fails, give a fallback
+                    response = "Hmm, I'm having a bit of trouble processing that. Could you rephrase, or perhaps try asking about the time, system stats, or say 'help' for options?";
+                }
             }
 
             speak(response);

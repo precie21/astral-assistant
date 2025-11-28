@@ -9,8 +9,10 @@ mod system_integration;
 mod config;
 mod llm_provider;
 mod automation;
+mod tts_engine;
 
 use commands::*;
+use tts_engine::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
@@ -35,6 +37,11 @@ fn main() {
             execute_automation,
             toggle_automation,
             trigger_wake_word,
+            speak_with_piper,
+            get_tts_config,
+            update_tts_config,
+            list_voices,
+            test_piper_tts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");
