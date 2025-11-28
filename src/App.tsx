@@ -31,22 +31,26 @@ function App() {
             };
 
             recognitionRef.current.onresult = (event: any) => {
-                const transcript = Array.from(event.results)
+                const currentTranscript = Array.from(event.results)
                     .map((result: any) => result[0])
                     .map((result: any) => result.transcript)
                     .join('');
                 
-                console.log('Speech recognized:', transcript);
-                setTranscript(transcript);
+                console.log('Speech recognized:', currentTranscript);
+                setTranscript(currentTranscript);
+                
+                // Process the command immediately if it's the final result
+                if (event.results[event.results.length - 1].isFinal) {
+                    console.log('Final transcript, processing:', currentTranscript);
+                    setIsListening(false);
+                    processCommand(currentTranscript);
+                }
             };
 
             recognitionRef.current.onend = () => {
+                console.log('Recognition ended');
                 setIsListening(false);
-                if (transcript) {
-                    processCommand(transcript);
-                } else {
-                    setAssistantState('idle');
-                }
+                setAssistantState('idle');
             };
 
             recognitionRef.current.onerror = (event: any) => {
