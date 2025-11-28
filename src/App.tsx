@@ -109,8 +109,10 @@ function App() {
                         
                         if (detected) {
                             console.log('[WAKE_WORD] Wake word detected! Activating...');
-                            // Trigger main listening
-                            startListening();
+                            // Stop wake word capture temporarily while user speaks
+                            stopWakeWordCapture();
+                            // Trigger listening via custom event
+                            window.dispatchEvent(new CustomEvent('wake-word-trigger'));
                         }
                     }
                 } catch (error) {
@@ -213,21 +215,34 @@ function App() {
         // Check if Whisper is available and enabled
         checkWhisperAvailability();
 
-        // Listen for wake word detection events from backend
+        // Listen for wake word detection events
         const setupEventListener = async () => {
             const { listen } = await import('@tauri-apps/api/event');
             const unlisten = await listen('wake-word-detected', () => {
                 console.log('[WAKE_WORD] Event received from backend, activating...');
-                startListening();
+                if (!isListening) {
+                    startListening();
+                }
             });
             
             return unlisten;
         };
 
+        // Listen for wake word trigger from frontend
+        const handleWakeWordTrigger = () => {
+            console.log('[WAKE_WORD] Frontend trigger received, activating...');
+            if (!isListening) {
+                startListening();
+            }
+        };
+
+        window.addEventListener('wake-word-trigger', handleWakeWordTrigger);
+
         let unlistenFn: any = null;
         setupEventListener().then(fn => { unlistenFn = fn; });
 
         return () => {
+            window.removeEventListener('wake-word-trigger', handleWakeWordTrigger);
             if (unlistenFn) unlistenFn();
         };
         
