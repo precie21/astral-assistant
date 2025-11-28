@@ -136,8 +136,18 @@ function App() {
         let response = "";
 
         try {
+            // Greetings
+            if (lowerCommand === 'hello' || lowerCommand === 'hi' || lowerCommand === 'hey' || lowerCommand.startsWith('hello.') || lowerCommand.startsWith('hi.')) {
+                const greetings = [
+                    "Hello! How can I assist you today?",
+                    "Hi there! What can I do for you?",
+                    "Greetings! I'm ASTRAL, your AI assistant. How may I help?",
+                    "Hello! Ready to assist you.",
+                ];
+                response = greetings[Math.floor(Math.random() * greetings.length)];
+            }
             // Time queries
-            if (lowerCommand.includes('time')) {
+            else if (lowerCommand.includes('time')) {
                 const now = new Date();
                 response = `The current time is ${now.toLocaleTimeString()}`;
             }
