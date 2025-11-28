@@ -3,9 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
