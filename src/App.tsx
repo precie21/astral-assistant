@@ -108,6 +108,14 @@ function App() {
     };
 
     const startListening = async () => {
+        // If already listening with Whisper, stop recording
+        if (isListening && useWhisper && mediaRecorderRef.current) {
+            console.log("Stopping Whisper recording...");
+            mediaRecorderRef.current.stop();
+            setIsListening(false);
+            return;
+        }
+        
         if (isListening) return;
         
         setTranscript("");
