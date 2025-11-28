@@ -15,8 +15,7 @@ pub struct SystemStats {
 #[cfg(target_os = "windows")]
 mod windows_monitor {
     use super::*;
-    use windows::Win32::System::ProcessStatus::{GetPerformanceInfo, PERFORMANCE_INFORMATION};
-    use windows::Win32::System::SystemInformation::{GetSystemInfo, GlobalMemoryStatusEx, MEMORYSTATUSEX, SYSTEM_INFO};
+    use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
     
     pub fn get_cpu_usage() -> Result<f32, String> {
         // Windows CPU usage requires sampling over time
@@ -53,8 +52,6 @@ mod windows_monitor {
 
 #[cfg(not(target_os = "windows"))]
 mod windows_monitor {
-    use super::*;
-    
     pub fn get_cpu_usage() -> Result<f32, String> {
         Err("CPU monitoring only available on Windows".to_string())
     }

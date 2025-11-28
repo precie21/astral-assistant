@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc;
+use tauri::Emitter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WakeWordConfig {
@@ -81,7 +81,7 @@ pub async fn is_wake_word_active() -> Result<bool, String> {
 // 2. Process in small chunks (sliding window)
 // 3. Run inference on each chunk
 // 4. Trigger callback when wake word detected
-pub fn detect_wake_word_in_audio(audio_data: &[f32], phrase: &str, sensitivity: f32) -> bool {
+pub fn detect_wake_word_in_audio(_audio_data: &[f32], _phrase: &str, _sensitivity: f32) -> bool {
     // Placeholder implementation
     // Real implementation would use:
     // - Porcupine SDK for commercial use
