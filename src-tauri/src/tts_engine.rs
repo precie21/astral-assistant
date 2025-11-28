@@ -21,8 +21,8 @@ impl Default for TTSConfig {
     fn default() -> Self {
         Self {
             voice_model: "en_GB-jenny_dioco-medium".to_string(),
-            voice_model_path: "models/en_GB-jenny_dioco-medium.onnx".to_string(),
-            piper_executable: "piper.exe".to_string(), // Will be in resources or PATH
+            voice_model_path: "en_GB-jenny_dioco-medium.onnx".to_string(),
+            piper_executable: if cfg!(windows) { "piper.exe" } else { "piper" }.to_string(),
             speaking_rate: 1.0,
             use_piper: false, // Start with browser TTS, enable after setup
         }
@@ -147,7 +147,8 @@ impl TTSEngine {
         }
 
         // Check in PATH
-        if let Ok(which_output) = Command::new("where")
+        let which_cmd = if cfg!(windows) { "where" } else { "which" };
+        if let Ok(which_output) = Command::new(which_cmd)
             .arg(&self.config.piper_executable)
             .output()
         {
@@ -201,8 +202,8 @@ impl TTSEngine {
 
         if let Some(app) = &self.app_handle {
             if let Ok(resource_dir) = app.path().resource_dir() {
-                let models_dir = resource_dir.join("models");
-                if let Ok(entries) = std::fs::read_dir(models_dir) {
+                // Look directly in resources/ for .onnx files
+                if let Ok(entries) = std::fs::read_dir(&resource_dir) {
                     for entry in entries.flatten() {
                         if let Some(filename) = entry.file_name().to_str() {
                             if filename.ends_with(".onnx") {
