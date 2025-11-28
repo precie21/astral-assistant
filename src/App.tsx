@@ -36,6 +36,7 @@ function App() {
                     .map((result: any) => result.transcript)
                     .join('');
                 
+                console.log('Speech recognized:', transcript);
                 setTranscript(transcript);
             };
 
@@ -97,16 +98,29 @@ function App() {
     };
 
     const speak = (text: string) => {
+        console.log('Speaking:', text);
         if (synthRef.current) {
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.rate = 1.0;
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
             
-            utterance.onstart = () => setAssistantState('speaking');
-            utterance.onend = () => setAssistantState('idle');
+            utterance.onstart = () => {
+                console.log('Speech started');
+                setAssistantState('speaking');
+            };
+            utterance.onend = () => {
+                console.log('Speech ended');
+                setAssistantState('idle');
+            };
+            utterance.onerror = (event) => {
+                console.error('Speech error:', event);
+                setAssistantState('idle');
+            };
             
             synthRef.current.speak(utterance);
+        } else {
+            console.error('Speech synthesis not available');
         }
     };
 
