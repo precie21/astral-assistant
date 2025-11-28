@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import HolographicNode from "./components/HolographicNode";
 import Dashboard from "./components/Dashboard";
@@ -8,19 +8,68 @@ function App() {
     const [isListening, setIsListening] = useState(false);
     const [assistantState, setAssistantState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
     const [showDashboard, setShowDashboard] = useState(false);
+    const [transcript, setTranscript] = useState("");
+    const [commandHistory, setCommandHistory] = useState<string[]>([]);
+    const recognitionRef = useRef<any>(null);
+    const synthRef = useRef<SpeechSynthesis | null>(null);
 
     useEffect(() => {
         // Initialize the assistant on mount
         initializeAssistant();
+        
+        // Initialize speech recognition
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = false;
+            recognitionRef.current.interimResults = true;
+            recognitionRef.current.lang = 'en-US';
 
-        // Listen for wake word events
-        // TODO: Set up event listeners from Rust backend
-    }, []);
+            recognitionRef.current.onstart = () => {
+                setAssistantState('listening');
+                setIsListening(true);
+            };
+
+            recognitionRef.current.onresult = (event: any) => {
+                const transcript = Array.from(event.results)
+                    .map((result: any) => result[0])
+                    .map((result: any) => result.transcript)
+                    .join('');
+                
+                setTranscript(transcript);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsListening(false);
+                if (transcript) {
+                    processCommand(transcript);
+                } else {
+                    setAssistantState('idle');
+                }
+            };
+
+            recognitionRef.current.onerror = (event: any) => {
+                console.error('Speech recognition error:', event.error);
+                setIsListening(false);
+                setAssistantState('idle');
+            };
+        }
+
+        // Initialize speech synthesis
+        synthRef.current = window.speechSynthesis;
+
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+        };
+    }, [transcript]);
 
     const initializeAssistant = async () => {
         try {
             await invoke("initialize_assistant");
             console.log("ASTRAL initialized successfully");
+            speak("ASTRAL initialized and ready");
         } catch (error) {
             console.error("Failed to initialize ASTRAL:", error);
         }
@@ -28,6 +77,142 @@ function App() {
 
     const toggleDashboard = () => {
         setShowDashboard(!showDashboard);
+    };
+
+    const startListening = () => {
+        if (recognitionRef.current && !isListening) {
+            setTranscript("");
+            try {
+                recognitionRef.current.start();
+            } catch (error) {
+                console.error('Error starting recognition:', error);
+            }
+        }
+    };
+
+    const stopListening = () => {
+        if (recognitionRef.current && isListening) {
+            recognitionRef.current.stop();
+        }
+    };
+
+    const speak = (text: string) => {
+        if (synthRef.current) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = () => setAssistantState('speaking');
+            utterance.onend = () => setAssistantState('idle');
+            
+            synthRef.current.speak(utterance);
+        }
+    };
+
+    const processCommand = async (command: string) => {
+        setAssistantState('thinking');
+        setCommandHistory(prev => [command, ...prev.slice(0, 4)]);
+        
+        const lowerCommand = command.toLowerCase();
+        let response = "";
+
+        try {
+            // Time queries
+            if (lowerCommand.includes('time')) {
+                const now = new Date();
+                response = `The current time is ${now.toLocaleTimeString()}`;
+            }
+            // Date queries
+            else if (lowerCommand.includes('date')) {
+                const now = new Date();
+                response = `Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+            }
+            // Automation routines
+            else if (lowerCommand.includes('work mode') || lowerCommand.includes('start work')) {
+                try {
+                    await invoke("execute_automation", { routineId: "work-mode" });
+                    response = "Work mode activated! Launching your productivity apps.";
+                } catch (error) {
+                    response = "I couldn't start work mode. Make sure the automation is enabled.";
+                }
+            }
+            else if (lowerCommand.includes('gaming mode') || lowerCommand.includes('start gaming')) {
+                try {
+                    await invoke("execute_automation", { routineId: "gaming-mode" });
+                    response = "Gaming mode activated! Good luck and have fun!";
+                } catch (error) {
+                    response = "I couldn't start gaming mode. Make sure the automation is enabled.";
+                }
+            }
+            else if (lowerCommand.includes('morning routine')) {
+                try {
+                    await invoke("execute_automation", { routineId: "morning-routine" });
+                    response = "Good morning! Starting your morning routine.";
+                } catch (error) {
+                    response = "I couldn't start the morning routine.";
+                }
+            }
+            else if (lowerCommand.includes('evening') || lowerCommand.includes('wind down')) {
+                try {
+                    await invoke("execute_automation", { routineId: "evening-winddown" });
+                    response = "Starting your evening wind down routine.";
+                } catch (error) {
+                    response = "I couldn't start the evening routine.";
+                }
+            }
+            // Weather (placeholder)
+            else if (lowerCommand.includes('weather')) {
+                response = "Weather integration coming soon. I'll be able to tell you the current weather conditions.";
+            }
+            // Open applications
+            else if (lowerCommand.includes('open')) {
+                const app = lowerCommand.replace('open', '').trim();
+                response = `Opening ${app}`;
+                try {
+                    await invoke("execute_command", { command: `open:${app}` });
+                } catch (error) {
+                    response = `I couldn't open ${app}. This feature is still in development.`;
+                }
+            }
+            // System info
+            else if (lowerCommand.includes('system') || lowerCommand.includes('stats')) {
+                try {
+                    const info: any = await invoke("get_system_info");
+                    response = `CPU usage is ${info.cpu_usage}%, Memory: ${Math.round(info.memory_used / 1024 / 1024 / 1024)} gigabytes used`;
+                } catch (error) {
+                    response = "System information is currently unavailable";
+                }
+            }
+            // Show/hide dashboard
+            else if (lowerCommand.includes('dashboard') || lowerCommand.includes('settings')) {
+                setShowDashboard(!showDashboard);
+                response = showDashboard ? "Closing dashboard" : "Opening dashboard";
+            }
+            // Help
+            else if (lowerCommand.includes('help') || lowerCommand.includes('what can you do')) {
+                response = "I can tell you the time, date, open applications, check system stats, run automation routines like work mode or gaming mode, and control your dashboard. I also have AI capabilities for complex questions. Try saying 'start work mode' or 'what time is it'";
+            }
+            // For complex queries, use LLM
+            else if (lowerCommand.length > 20 || lowerCommand.includes('why') || lowerCommand.includes('how') || lowerCommand.includes('explain')) {
+                try {
+                    const llmResponse: any = await invoke("send_llm_message", { message: command });
+                    response = llmResponse.content;
+                } catch (error) {
+                    response = "I'm having trouble connecting to my AI brain right now. Make sure Ollama is running with 'ollama serve' or configure an API key in settings.";
+                }
+            }
+            // Default
+            else {
+                response = "I'm not sure how to help with that yet. Try asking about the time, date, system stats, or say 'help' for more options. For complex questions, I can use my AI capabilities.";
+            }
+
+            speak(response);
+        } catch (error) {
+            console.error('Command processing error:', error);
+            speak("I encountered an error processing that command");
+            setAssistantState('idle');
+        }
     };
 
     return (
@@ -45,6 +230,7 @@ function App() {
             <HolographicNode
                 state={assistantState}
                 isListening={isListening}
+                onActivate={startListening}
             />
 
             {/* Dashboard Panel */}
@@ -59,7 +245,7 @@ function App() {
             />
 
             {/* Status Indicator */}
-            <div className="absolute bottom-8 left-8 glass px-4 py-2 rounded-lg">
+            <div className="absolute bottom-8 left-8 glass px-4 py-3 rounded-lg space-y-2 max-w-md">
                 <div className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${assistantState === 'idle' ? 'bg-gray-400' :
                             assistantState === 'listening' ? 'bg-cyber-cyan animate-pulse' :
@@ -68,6 +254,19 @@ function App() {
                         }`} />
                     <span className="text-sm font-medium capitalize">{assistantState}</span>
                 </div>
+                {transcript && (
+                    <div className="text-xs text-white/60 italic">
+                        "{transcript}"
+                    </div>
+                )}
+                {commandHistory.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-white/10">
+                        <div className="text-xs text-white/40 mb-1">Recent:</div>
+                        {commandHistory.slice(0, 3).map((cmd, i) => (
+                            <div key={i} className="text-xs text-white/50">• {cmd}</div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Version Info */}

@@ -1,5 +1,16 @@
 use serde::{Deserialize, Serialize};
 use log::info;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
+
+use crate::llm_provider::{LLMManager, LLMConfig, LLMResponse};
+use crate::automation::{AutomationManager, AutomationRoutine, AutomationResult};
+use crate::audio_engine::AudioEngine;
+
+// Global state managers
+static LLM_MANAGER: Lazy<Mutex<Option<LLMManager>>> = Lazy::new(|| Mutex::new(None));
+static AUTOMATION_MANAGER: Lazy<Mutex<AutomationManager>> = Lazy::new(|| Mutex::new(AutomationManager::new()));
+static AUDIO_ENGINE: Lazy<Mutex<Option<AudioEngine>>> = Lazy::new(|| Mutex::new(None));
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemInfo {
@@ -14,11 +25,26 @@ pub struct SystemInfo {
 pub async fn initialize_assistant() -> Result<String, String> {
     info!("Initializing ASTRAL assistant...");
     
-    // TODO: Initialize audio engine
-    // TODO: Load user configuration
-    // TODO: Start wake word detection
+    // Initialize audio engine
+    let mut audio_engine = AudioEngine::new();
     
-    Ok("ASTRAL initialized successfully".to_string())
+    // Start wake word detection
+    match audio_engine.start_wake_word_detection().await {
+        Ok(_) => info!("Wake word detection started"),
+        Err(e) => info!("Wake word detection not started: {}", e),
+    }
+    
+    *AUDIO_ENGINE.lock().unwrap() = Some(audio_engine);
+    
+    // Initialize LLM with default config (Ollama local)
+    let llm_config = LLMConfig::default();
+    let llm_manager = LLMManager::new(llm_config);
+    *LLM_MANAGER.lock().unwrap() = Some(llm_manager);
+    
+    // Automation manager is already initialized via Lazy
+    info!("ASTRAL initialization complete");
+    
+    Ok("ASTRAL initialized successfully - Wake word: 'Hey ASTRAL', LLM: Local Ollama, Automation: Active".to_string())
 }
 
 /// Get current system information
@@ -49,9 +75,128 @@ pub async fn get_system_info() -> Result<SystemInfo, String> {
 pub async fn execute_command(command: String) -> Result<String, String> {
     info!("Executing command: {}", command);
     
-    // TODO: Parse command
-    // TODO: Route to appropriate handler
-    // TODO: Execute action
+    // Check if this should go to LLM or handle locally
+    let lower = command.to_lowercase();
     
-    Ok(format!("Command executed: {}", command))
+    // Handle automation trigger phrases
+    if lower.contains("work mode") || lower.contains("start work") {
+        let mut automation = AUTOMATION_MANAGER.lock().unwrap();
+        match automation.execute_routine("work-mode").await {
+            Ok(_) => return Ok("Work mode activated!".to_string()),
+            Err(e) => return Ok(format!("Failed to start work mode: {}", e)),
+        }
+    }
+    
+    if lower.contains("gaming mode") || lower.contains("start gaming") {
+        let mut automation = AUTOMATION_MANAGER.lock().unwrap();
+        match automation.execute_routine("gaming-mode").await {
+            Ok(_) => return Ok("Gaming mode activated!".to_string()),
+            Err(e) => return Ok(format!("Failed to start gaming mode: {}", e)),
+        }
+    }
+    
+    // For complex queries, route to LLM
+    if let Some(llm_manager) = LLM_MANAGER.lock().unwrap().as_mut() {
+        match llm_manager.send_message(&command).await {
+            Ok(response) => Ok(response.content),
+            Err(e) => {
+                info!("LLM error: {}, falling back to basic response", e);
+                Ok(format!("I heard: {}. LLM is not available right now.", command))
+            }
+        }
+    } else {
+        Ok(format!("Command received: {}", command))
+    }
+}
+
+// ===== LLM Commands =====
+
+#[tauri::command]
+pub async fn send_llm_message(message: String) -> Result<LLMResponse, String> {
+    info!("Sending message to LLM: {}", message);
+    
+    let mut manager_guard = LLM_MANAGER.lock().unwrap();
+    
+    if manager_guard.is_none() {
+        *manager_guard = Some(LLMManager::new(LLMConfig::default()));
+    }
+    
+    let manager = manager_guard.as_mut().unwrap();
+    
+    manager.send_message(&message)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_llm_config() -> Result<LLMConfig, String> {
+    // Return current config or default
+    Ok(LLMConfig::default())
+}
+
+#[tauri::command]
+pub fn update_llm_config(config: LLMConfig) -> Result<String, String> {
+    info!("Updating LLM config: {:?}", config.provider);
+    
+    let mut manager_guard = LLM_MANAGER.lock().unwrap();
+    
+    if let Some(manager) = manager_guard.as_mut() {
+        manager.update_config(config.clone());
+    } else {
+        *manager_guard = Some(LLMManager::new(config));
+    }
+    
+    Ok("LLM configuration updated".to_string())
+}
+
+#[tauri::command]
+pub async fn test_llm_connection(config: LLMConfig) -> Result<bool, String> {
+    crate::llm_provider::test_connection(&config)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ===== Automation Commands =====
+
+#[tauri::command]
+pub fn get_automation_routines() -> Result<Vec<AutomationRoutine>, String> {
+    let manager = AUTOMATION_MANAGER.lock().unwrap();
+    Ok(manager.get_all_routines())
+}
+
+#[tauri::command]
+pub async fn execute_automation(routine_id: String) -> Result<AutomationResult, String> {
+    info!("Executing automation: {}", routine_id);
+    
+    let mut manager = AUTOMATION_MANAGER.lock().unwrap();
+    manager.execute_routine(&routine_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn toggle_automation(routine_id: String) -> Result<bool, String> {
+    info!("Toggling automation: {}", routine_id);
+    
+    let mut manager = AUTOMATION_MANAGER.lock().unwrap();
+    manager.toggle_routine(&routine_id)
+        .map_err(|e| e.to_string())
+}
+
+// ===== Audio Commands =====
+
+#[tauri::command]
+pub async fn trigger_wake_word() -> Result<String, String> {
+    info!("Manually triggering wake word");
+    
+    let engine_guard = AUDIO_ENGINE.lock().unwrap();
+    
+    if let Some(engine) = engine_guard.as_ref() {
+        engine.trigger_wake_word()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok("Wake word triggered".to_string())
+    } else {
+        Ok("Audio engine not initialized".to_string())
+    }
 }

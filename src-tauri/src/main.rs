@@ -7,6 +7,8 @@ mod commands;
 mod audio_engine;
 mod system_integration;
 mod config;
+mod llm_provider;
+mod automation;
 
 use commands::*;
 
@@ -20,10 +22,19 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             initialize_assistant,
             get_system_info,
             execute_command,
+            send_llm_message,
+            get_llm_config,
+            update_llm_config,
+            test_llm_connection,
+            get_automation_routines,
+            execute_automation,
+            toggle_automation,
+            trigger_wake_word,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");
