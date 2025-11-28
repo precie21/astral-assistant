@@ -16,9 +16,13 @@ function App() {
     const audioChunksRef = useRef<Blob[]>([]);
     const [useWhisper, setUseWhisper] = useState(false);
     const [audioLevel, setAudioLevel] = useState(0);
+    const [wakeWordActive, setWakeWordActive] = useState(false);
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animationFrameRef = useRef<number | null>(null);
+    const wakeWordStreamRef = useRef<MediaStream | null>(null);
+    const wakeWordRecorderRef = useRef<MediaRecorder | null>(null);
+    const wakeWordIntervalRef = useRef<number | null>(null);
 
     // Load settings on startup
     useEffect(() => {
@@ -57,18 +61,124 @@ function App() {
         loadSettings();
     }, []);
 
+    // Wake word continuous audio capture
+    const startWakeWordCapture = async () => {
+        try {
+            console.log('[WAKE_WORD] Starting continuous audio capture...');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            wakeWordStreamRef.current = stream;
+
+            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            wakeWordRecorderRef.current = recorder;
+            const chunks: Blob[] = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+
+            recorder.onstop = async () => {
+                if (chunks.length === 0) return;
+
+                const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+                chunks.length = 0;
+
+                // Convert to WAV and send to Whisper
+                try {
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const audioContext = new AudioContext({ sampleRate: 16000 });
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    
+                    // Convert to WAV
+                    const wavBlob = await audioBufferToWav(audioBuffer);
+                    const wavBytes = new Uint8Array(await wavBlob.arrayBuffer());
+                    
+                    // Transcribe with Whisper
+                    const transcript: string = await invoke("whisper_transcribe_bytes", { 
+                        audioBytes: Array.from(wavBytes)
+                    });
+                    
+                    if (transcript && transcript.trim().length > 0) {
+                        console.log('[WAKE_WORD] Transcribed:', transcript);
+                        
+                        // Check for wake word
+                        const detected: boolean = await invoke('check_for_wake_word', { 
+                            text: transcript 
+                        });
+                        
+                        if (detected) {
+                            console.log('[WAKE_WORD] Wake word detected! Activating...');
+                            // Trigger main listening
+                            startListening();
+                        }
+                    }
+                } catch (error) {
+                    console.error('[WAKE_WORD] Transcription error:', error);
+                }
+
+                // Start next recording cycle if wake word is still active
+                const isActive = await invoke('is_wake_word_active');
+                if (isActive && wakeWordRecorderRef.current) {
+                    setTimeout(() => {
+                        if (wakeWordRecorderRef.current?.state === 'inactive') {
+                            wakeWordRecorderRef.current.start();
+                            setTimeout(() => {
+                                if (wakeWordRecorderRef.current?.state === 'recording') {
+                                    wakeWordRecorderRef.current.stop();
+                                }
+                            }, 2000); // Record 2 second chunks
+                        }
+                    }, 100);
+                }
+            };
+
+            // Start recording in 2-second intervals
+            recorder.start();
+            setTimeout(() => {
+                if (recorder.state === 'recording') {
+                    recorder.stop();
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('[WAKE_WORD] Failed to start audio capture:', error);
+        }
+    };
+
+    const stopWakeWordCapture = () => {
+        console.log('[WAKE_WORD] Stopping continuous audio capture...');
+        
+        if (wakeWordRecorderRef.current && wakeWordRecorderRef.current.state === 'recording') {
+            wakeWordRecorderRef.current.stop();
+        }
+        
+        if (wakeWordStreamRef.current) {
+            wakeWordStreamRef.current.getTracks().forEach(track => track.stop());
+            wakeWordStreamRef.current = null;
+        }
+        
+        wakeWordRecorderRef.current = null;
+    };
+
     // Wake word detection effect
     useEffect(() => {
         const setupWakeWordListener = async () => {
             try {
                 const config: any = await invoke('get_wake_word_config');
-                if (config.enabled) {
+                if (config.enabled && useWhisper) {
                     console.log('[WAKE_WORD] Wake word detection enabled');
-                    // Start continuous background listening
                     await invoke('start_wake_word_detection');
+                    setWakeWordActive(true);
+                    
+                    // Start continuous audio capture
+                    startWakeWordCapture();
+                } else {
+                    setWakeWordActive(false);
                 }
             } catch (error) {
                 console.error('Failed to setup wake word:', error);
+                setWakeWordActive(false);
             }
         };
 
@@ -76,9 +186,11 @@ function App() {
 
         return () => {
             // Cleanup: stop wake word detection when component unmounts
+            stopWakeWordCapture();
             invoke('stop_wake_word_detection').catch(console.error);
+            setWakeWordActive(false);
         };
-    }, []);
+    }, [useWhisper]);
 
     const monitorAudioLevel = () => {
         if (!analyserRef.current) return;
@@ -100,6 +212,24 @@ function App() {
         
         // Check if Whisper is available and enabled
         checkWhisperAvailability();
+
+        // Listen for wake word detection events from backend
+        const setupEventListener = async () => {
+            const { listen } = await import('@tauri-apps/api/event');
+            const unlisten = await listen('wake-word-detected', () => {
+                console.log('[WAKE_WORD] Event received from backend, activating...');
+                startListening();
+            });
+            
+            return unlisten;
+        };
+
+        let unlistenFn: any = null;
+        setupEventListener().then(fn => { unlistenFn = fn; });
+
+        return () => {
+            if (unlistenFn) unlistenFn();
+        };
         
         // Initialize speech recognition
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -596,6 +726,12 @@ function App() {
                                     'bg-cyber-pink animate-pulse'
                         }`} />
                     <span className="text-sm font-medium capitalize">{assistantState}</span>
+                    {wakeWordActive && (
+                        <div className="ml-auto flex items-center gap-2 text-xs text-cyber-cyan">
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyber-cyan animate-pulse" />
+                            Wake word active
+                        </div>
+                    )}
                 </div>
                 {transcript && (
                     <div className="text-xs text-white/60 italic">
@@ -614,7 +750,7 @@ function App() {
 
             {/* Version Info */}
             <div className="absolute bottom-4 right-4 text-xs text-white/30 font-mono">
-                ASTRAL v0.1.0-alpha
+                AKI v0.1.0-alpha
             </div>
         </div>
     );

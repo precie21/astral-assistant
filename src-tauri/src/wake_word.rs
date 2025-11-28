@@ -100,14 +100,34 @@ pub async fn is_wake_word_active() -> Result<bool, String> {
 }
 
 // Check if text contains wake word phrase
-pub fn contains_wake_word(text: &str, wake_phrase: &str) -> bool {
+pub fn contains_wake_word(text: &str, _wake_phrase: &str) -> bool {
     let text_lower = text.to_lowercase();
-    let phrase_lower = wake_phrase.to_lowercase();
     
-    // Check for exact match or phrase within text
-    text_lower.contains(&phrase_lower) || 
-    // Also check without spaces (e.g., "heyaki")
-    text_lower.replace(" ", "").contains(&phrase_lower.replace(" ", ""))
+    // Multiple wake word variations
+    let wake_words = [
+        "hey aki",
+        "hi aki", 
+        "aki",
+        "okay aki",
+        "ok aki",
+        "yo aki",
+    ];
+    
+    // Check for any wake word
+    for wake_word in &wake_words {
+        if text_lower.contains(wake_word) {
+            return true;
+        }
+        
+        // Also check without spaces (e.g., "heyaki")
+        let no_space_text = text_lower.replace(" ", "");
+        let no_space_wake = wake_word.replace(" ", "");
+        if no_space_text.contains(&no_space_wake) {
+            return true;
+        }
+    }
+    
+    false
 }
 
 // Simulated wake word detection function
