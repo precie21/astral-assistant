@@ -137,30 +137,47 @@ pub fn find_app(query: &str) -> Option<AppInfo> {
 pub fn launch_app(app_name: &str) -> Result<LaunchResult, String> {
     let app_info = find_app(app_name).ok_or_else(|| format!("Application '{}' not found", app_name))?;
     
-    // Try to launch using cmd /c start
-    let result = Command::new("cmd")
+    // Method 1: Try using Windows Shell via PowerShell (searches Start Menu)
+    let ps_result = Command::new("powershell")
+        .args(&[
+            "-Command",
+            &format!("Start-Process '{}'", app_info.name)
+        ])
+        .spawn();
+    
+    if ps_result.is_ok() {
+        return Ok(LaunchResult {
+            success: true,
+            message: format!("Launched {}", app_info.name),
+            app_name: app_info.name.clone(),
+        });
+    }
+    
+    // Method 2: Try cmd /c start with app name (searches PATH and Start Menu)
+    let cmd_result = Command::new("cmd")
+        .args(&["/C", "start", "", &app_info.name])
+        .spawn();
+    
+    if cmd_result.is_ok() {
+        return Ok(LaunchResult {
+            success: true,
+            message: format!("Launched {}", app_info.name),
+            app_name: app_info.name.clone(),
+        });
+    }
+    
+    // Method 3: Try with executable name
+    let exe_result = Command::new("cmd")
         .args(&["/C", "start", "", &app_info.executable])
         .spawn();
     
-    match result {
+    match exe_result {
         Ok(_) => Ok(LaunchResult {
             success: true,
             message: format!("Launched {}", app_info.name),
             app_name: app_info.name.clone(),
         }),
-        Err(e) => {
-            // Try direct execution as fallback
-            let fallback = Command::new(&app_info.executable).spawn();
-            
-            match fallback {
-                Ok(_) => Ok(LaunchResult {
-                    success: true,
-                    message: format!("Launched {}", app_info.name),
-                    app_name: app_info.name.clone(),
-                }),
-                Err(_) => Err(format!("Failed to launch {}: {}", app_info.name, e)),
-            }
-        }
+        Err(e) => Err(format!("Failed to launch {}: {}. Try installing it or check if it's in your Start Menu.", app_info.name, e)),
     }
 }
 
