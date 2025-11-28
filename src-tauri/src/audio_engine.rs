@@ -10,6 +10,7 @@ pub struct AudioEngine {
     // TODO: Add TTS provider
 }
 
+#[allow(dead_code)]
 impl AudioEngine {
     pub fn new() -> Self {
         info!("Initializing Audio Engine...");

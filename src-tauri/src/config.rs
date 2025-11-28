@@ -53,6 +53,7 @@ impl Default for Config {
     }
 }
 
+#[allow(dead_code)]
 impl Config {
     pub fn load() -> Result<Self> {
         let config_path = Self::config_path()?;
