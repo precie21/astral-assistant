@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, AppHandle, Manager};
+use tauri::{Emitter, AppHandle};
 use tokio::time::{Duration, sleep};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -54,7 +54,7 @@ pub async fn start_wake_word_detection(app: AppHandle) -> Result<(), String> {
         
         while WAKE_WORD_ACTIVE.load(Ordering::Relaxed) {
             // Check Whisper config
-            let whisper_config = match crate::whisper_stt::get_whisper_config().await {
+            let whisper_config = match crate::whisper_stt::whisper_get_config(app.clone()).await {
                 Ok(cfg) => cfg,
                 Err(_) => {
                     sleep(Duration::from_secs(5)).await;

@@ -14,7 +14,6 @@ pub struct SystemStats {
 
 #[cfg(target_os = "windows")]
 mod windows_monitor {
-    use super::*;
     use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
     
     pub fn get_cpu_usage() -> Result<f32, String> {
@@ -105,8 +104,7 @@ impl CpuTracker {
 
 // Sysinfo-based CPU monitoring for cross-platform support
 mod sysinfo {
-    use super::*;
-    
+    #[allow(dead_code)]
     pub fn get_cpu_usage() -> Result<f32, String> {
         // Use system command to get CPU usage
         #[cfg(target_os = "windows")]
