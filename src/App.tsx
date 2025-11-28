@@ -101,9 +101,42 @@ function App() {
         }
     };
 
-    const speak = (text: string) => {
+    const speak = async (text: string) => {
         console.log('Speaking:', text);
         setAssistantState('speaking');
+        
+        try {
+            // Try GPT-SoVITS first
+            const config: any = await invoke("gptsovits_get_config");
+            
+            if (config.enabled) {
+                console.log('Using GPT-SoVITS TTS');
+                const audioPath: string = await invoke("gptsovits_speak", { text });
+                console.log('GPT-SoVITS generated audio at:', audioPath);
+                
+                // Convert file path to Tauri asset protocol
+                const { convertFileSrc } = await import('@tauri-apps/api/core');
+                const assetUrl = convertFileSrc(audioPath);
+                
+                // Play the audio file
+                const audio = new Audio(assetUrl);
+                audio.onended = () => {
+                    console.log('GPT-SoVITS speech ended');
+                    setAssistantState('idle');
+                };
+                audio.onerror = (e) => {
+                    console.error('GPT-SoVITS audio playback error:', e);
+                    console.log('Falling back to browser TTS');
+                    speakWithBrowser(text);
+                };
+                await audio.play();
+                return;
+            }
+        } catch (error) {
+            console.log('GPT-SoVITS not available, using browser TTS:', error);
+        }
+        
+        // Fallback to browser TTS
         speakWithBrowser(text);
     };
     

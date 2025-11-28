@@ -9,8 +9,10 @@ mod system_integration;
 mod config;
 mod llm_provider;
 mod automation;
+mod gptsovits_tts;
 
 use commands::*;
+use gptsovits_tts::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 fn main() {
@@ -35,6 +37,11 @@ fn main() {
             execute_automation,
             toggle_automation,
             trigger_wake_word,
+            gptsovits_health_check,
+            gptsovits_speak,
+            gptsovits_get_config,
+            gptsovits_update_config,
+            gptsovits_test,
         ])
         .run(tauri::generate_context!())
         .expect("error while running ASTRAL application");

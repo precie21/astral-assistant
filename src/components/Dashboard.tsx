@@ -202,6 +202,33 @@ function SettingsTab() {
     });
     const [llmProvider, setLlmProvider] = useState('Ollama');
     const [showApiKey, setShowApiKey] = useState(false);
+    const [ttsEnabled, setTtsEnabled] = useState(false);
+    const [ttsServerStatus, setTtsServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+    useEffect(() => {
+        loadTTSConfig();
+        checkTTSServerStatus();
+    }, []);
+
+    const loadTTSConfig = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const config: any = await invoke('gptsovits_get_config');
+            setTtsEnabled(config.enabled);
+        } catch (error) {
+            console.error('Failed to load TTS config:', error);
+        }
+    };
+
+    const checkTTSServerStatus = async () => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const isOnline: boolean = await invoke('gptsovits_health_check');
+            setTtsServerStatus(isOnline ? 'online' : 'offline');
+        } catch (error) {
+            setTtsServerStatus('offline');
+        }
+    };
 
     const toggleSetting = (key: keyof typeof settings) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -272,11 +299,64 @@ function SettingsTab() {
             <div className="glass p-4 rounded-lg">
                 <h3 className="text-sm font-semibold text-white/60 mb-3">Voice Settings</h3>
                 <div className="space-y-3">
-                    <div className="text-sm text-white/70">
-                        Currently using browser TTS (default)
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm font-medium">GPT-SoVITS Server</div>
+                            <div className="text-xs text-white/50">
+                                Status: {ttsServerStatus === 'checking' ? '⏳ Checking...' : 
+                                        ttsServerStatus === 'online' ? '🟢 Online' : 
+                                        '🔴 Offline'}
+                            </div>
+                        </div>
+                        <button 
+                            className="text-xs cyber-button px-2 py-1"
+                            onClick={checkTTSServerStatus}
+                        >
+                            Refresh
+                        </button>
                     </div>
+                    
+                    <ToggleItem 
+                        label="Use GPT-SoVITS (Natural Voice)" 
+                        enabled={ttsEnabled}
+                        onToggle={async () => {
+                            const newState = !ttsEnabled;
+                            setTtsEnabled(newState);
+                            try {
+                                const { invoke } = await import('@tauri-apps/api/core');
+                                const config: any = await invoke('gptsovits_get_config');
+                                config.enabled = newState;
+                                await invoke('gptsovits_update_config', { config });
+                                console.log('GPT-SoVITS', newState ? 'enabled' : 'disabled');
+                            } catch (error) {
+                                console.error('Failed to update TTS config:', error);
+                            }
+                        }}
+                    />
+                    
+                    <button 
+                        className="w-full cyber-button text-sm"
+                        onClick={async () => {
+                            try {
+                                const { invoke } = await import('@tauri-apps/api/core');
+                                const result: string = await invoke('gptsovits_test');
+                                alert(result);
+                            } catch (error) {
+                                alert('Test failed: ' + error);
+                            }
+                        }}
+                    >
+                        Test Voice
+                    </button>
+                    
+                    {ttsServerStatus === 'offline' && (
+                        <div className="text-xs text-white/50 bg-red-500/10 border border-red-500/30 rounded p-2">
+                            ⚠️ Server offline. Start with: cd gpt-sovits && .\start_server.bat
+                        </div>
+                    )}
+                    
                     <div className="text-xs text-white/50 bg-cyber-purple/10 border border-cyber-purple/30 rounded p-2">
-                        ℹ️ Advanced TTS options coming soon (GPT-SoVITS, ElevenLabs, etc.)
+                        ℹ️ Run install-gptsovits.ps1 to setup (~2GB download)
                     </div>
                 </div>
             </div>
