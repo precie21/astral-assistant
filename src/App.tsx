@@ -140,14 +140,27 @@ function App() {
                     console.log("Recording stopped, processing with Whisper...");
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                     
+                    console.log(`Audio blob size: ${audioBlob.size} bytes`);
+                    
                     // Convert to WAV format for Whisper
-                    const audioContext = new AudioContext();
+                    const audioContext = new AudioContext({ sampleRate: 16000 }); // Whisper works best with 16kHz
                     const arrayBuffer = await audioBlob.arrayBuffer();
                     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    
+                    console.log(`Audio duration: ${audioBuffer.duration} seconds`);
+                    
+                    // Check if audio is too short
+                    if (audioBuffer.duration < 0.5) {
+                        console.warn("Audio too short, ignoring...");
+                        setAssistantState('idle');
+                        return;
+                    }
                     
                     // Convert AudioBuffer to WAV
                     const wavBlob = await audioBufferToWav(audioBuffer);
                     const wavBytes = new Uint8Array(await wavBlob.arrayBuffer());
+                    
+                    console.log(`WAV file size: ${wavBytes.length} bytes`);
                     
                     try {
                         setAssistantState('thinking');
@@ -155,6 +168,14 @@ function App() {
                             audioBytes: Array.from(wavBytes)
                         });
                         console.log("Whisper transcription:", transcript);
+                        
+                        if (!transcript || transcript.trim().length === 0) {
+                            console.warn("Empty transcription, falling back to browser speech");
+                            setAssistantState('idle');
+                            // Could fall back to browser speech here
+                            return;
+                        }
+                        
                         setTranscript(transcript);
                         processCommand(transcript);
                     } catch (error) {
