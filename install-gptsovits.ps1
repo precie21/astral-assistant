@@ -72,7 +72,14 @@ if ($useGPU) {
     pip install torch torchvision torchaudio
 }
 
-pip install -r requirements.txt
+# Install requirements if they exist
+if (Test-Path "requirements.txt") {
+    pip install -r requirements.txt
+}
+
+# Install additional packages for API server
+Write-Host "[INFO] Installing API server dependencies..." -ForegroundColor Cyan
+pip install fastapi uvicorn soundfile pydantic
 
 # Download pre-trained models
 Write-Host "[INFO] Downloading pre-trained models..." -ForegroundColor Cyan
@@ -104,58 +111,90 @@ if (!(Test-Path $sovitsModelPath)) {
 Write-Host "[INFO] Downloading pre-trained voice samples..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path "reference_audio" | Out-Null
 
-# Create a simple API server script
+# Create a simple API server script using GPT-SoVITS's actual inference module
 Write-Host "[INFO] Creating API server script..." -ForegroundColor Cyan
 $apiScript = @'
 import os
 import sys
 import torch
+import io
+import soundfile as sf
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 import uvicorn
-from TTS_infer_pack.TTS import TTS, TTS_Config
+
+# Add GPT-SoVITS to path
+sys.path.append(os.path.dirname(__file__))
+
+# Import GPT-SoVITS inference functions
+try:
+    from GPT_SoVITS.inference_webui import get_tts_wav
+    print("Successfully imported GPT-SoVITS inference module")
+except ImportError as e:
+    print(f"Warning: Could not import inference module: {e}")
+    print("Using mock mode for testing")
+    get_tts_wav = None
 
 app = FastAPI()
 
-# Initialize TTS
-print("Loading GPT-SoVITS models...")
-config = TTS_Config("GPT_SoVITS/configs/tts_infer.yaml")
-tts_model = TTS(config)
-print("Models loaded successfully!")
-
 class TTSRequest(BaseModel):
     text: str
-    reference_audio: str = "reference_audio/default.wav"
-    reference_text: str = "Hello, this is a reference audio sample."
-    language: str = "en"
+    text_language: str = "en"
 
 @app.post("/tts")
 async def generate_speech(request: TTSRequest):
     try:
-        output_path = "output/temp_speech.wav"
-        os.makedirs("output", exist_ok=True)
+        if get_tts_wav is None:
+            # Mock response for testing
+            return Response(
+                content=b"RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00D\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00",
+                media_type="audio/wav"
+            )
         
-        # Generate speech
-        tts_model.generate(
+        # Generate speech using GPT-SoVITS
+        audio_output = get_tts_wav(
+            ref_wav_path="",  # Will use default
+            prompt_text="",    # Will use default
+            prompt_language=request.text_language,
             text=request.text,
-            reference_audio=request.reference_audio,
-            reference_text=request.reference_text,
-            language=request.language,
-            output_path=output_path
+            text_language=request.text_language,
         )
         
-        return FileResponse(output_path, media_type="audio/wav")
+        # Convert audio to WAV bytes
+        buffer = io.BytesIO()
+        sf.write(buffer, audio_output, 32000, format='WAV')
+        buffer.seek(0)
+        
+        return Response(content=buffer.read(), media_type="audio/wav")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "model": "GPT-SoVITS"}
+    return {
+        "status": "ok", 
+        "model": "GPT-SoVITS",
+        "inference_available": get_tts_wav is not None
+    }
+
+@app.get("/")
+async def root():
+    return {
+        "name": "GPT-SoVITS API for ASTRAL",
+        "version": "1.0",
+        "endpoints": ["/health", "/tts"]
+    }
 
 if __name__ == "__main__":
-    print("Starting GPT-SoVITS API server on http://localhost:9880")
-    uvicorn.run(app, host="0.0.0.0", port=9880)
+    print("=" * 60)
+    print("Starting GPT-SoVITS API Server for ASTRAL")
+    print("=" * 60)
+    print(f"Server URL: http://localhost:9880")
+    print(f"Health check: http://localhost:9880/health")
+    print(f"TTS endpoint: POST http://localhost:9880/tts")
+    print("=" * 60)
+    uvicorn.run(app, host="0.0.0.0", port=9880, log_level="info")
 '@
 
 $apiScript | Out-File -FilePath "api_server.py" -Encoding UTF8
